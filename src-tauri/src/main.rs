@@ -26,6 +26,7 @@ use tray_icon::Glyph;
 
 const HISTORY_TTL: Duration = Duration::from_secs(30 * 60);
 const POPOVER_GAP: f64 = 8.0;
+const ALL_SERVERS: &str = "*";
 const UPDATE_INTERVAL: Duration = Duration::from_secs(6 * 60 * 60);
 
 #[derive(Debug, Clone, Serialize)]
@@ -35,6 +36,8 @@ struct RunView {
     progress: Option<Progress>,
     steps: Vec<Node>,
     url: String,
+    server_id: String,
+    server_name: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -42,6 +45,22 @@ struct RunView {
 struct QueueGroup {
     name: String,
     items: Vec<RunView>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ServerChoice {
+    id: String,
+    name: String,
+    active: bool,
+}
+
+/// A server that can't be read while others can.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Problem {
+    server_name: String,
+    connection: Connection,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -57,6 +76,10 @@ struct View {
     queued: Vec<QueueGroup>,
     workers: Vec<Worker>,
     taken_at: DateTime<Utc>,
+    all_servers: bool,
+    servers: Vec<ServerChoice>,
+    problems: Vec<Problem>,
+    allow_actions: bool,
 }
 
 impl View {
@@ -72,7 +95,28 @@ impl View {
             queued: vec![],
             workers: vec![],
             taken_at: Utc::now(),
+            all_servers: false,
+            servers: vec![],
+            problems: vec![],
+            allow_actions: false,
         }
+    }
+}
+
+/// What one server last reported.
+#[derive(Debug, Clone)]
+struct ServerView {
+    connection: Connection,
+    version: Option<String>,
+    failed: Vec<RunView>,
+    running: Vec<RunView>,
+    queued: Vec<QueueGroup>,
+    workers: Vec<Worker>,
+}
+
+impl ServerView {
+    fn down(connection: Connection) -> Self {
+        Self { connection, version: None, failed: vec![], running: vec![], queued: vec![], workers: vec![] }
     }
 }
 
@@ -82,7 +126,8 @@ struct Watch {
     seen_failed: Option<HashSet<String>>,
     seen_running: Option<HashSet<(String, String)>>,
     backoff: Backoff,
-    server_id: Option<String>,
+    next: Option<Instant>,
+    last: Option<ServerView>,
 }
 
 struct AppState {
@@ -126,25 +171,11 @@ fn run_key(r: &DagRun) -> String {
     format!("{}/{}", r.name, r.dag_run_id)
 }
 
-/// Refreshes the view and returns how long to wait before the next look.
-async fn poll_once(app: &AppHandle, watch: &mut Watch) -> Duration {
-    let state = app.state::<AppState>();
-    let config = state.config.lock().unwrap().clone();
-    let popover_open = *state.popover_open.lock().unwrap();
-
-    let Some(server) = config.active().cloned() else {
-        publish(app, View::empty(false, Connection::Ok));
-        return poll_interval(popover_open, false);
-    };
-    if watch.server_id.as_deref() != Some(&server.id) {
-        *watch = Watch { server_id: Some(server.id.clone()), ..Default::default() };
-    }
+/// One look at one server, and how long to wait before the next.
+async fn poll_server(app: &AppHandle, config: &Config, server: &Server, multi: bool, popover_open: bool, watch: &mut Watch) -> (ServerView, Duration) {
     let auth = match server.auth() {
         Ok(a) => a,
-        Err(_) => {
-            publish(app, View::empty(true, Connection::AuthFailed));
-            return poll_interval(popover_open, false);
-        }
+        Err(_) => return (ServerView::down(Connection::AuthFailed), poll_interval(popover_open, false)),
     };
 
     let now = Utc::now();
@@ -153,11 +184,7 @@ async fn poll_once(app: &AppHandle, watch: &mut Watch) -> Duration {
 
     if snap.connection != Connection::Ok {
         watch.backoff.record_failure();
-        let mut view = View::empty(true, snap.connection);
-        view.server_name = Some(server.name.clone());
-        view.server_url = Some(server.url.clone());
-        publish(app, view);
-        return watch.backoff.delay().unwrap_or(Duration::from_secs(5));
+        return (ServerView::down(snap.connection), watch.backoff.delay().unwrap_or(Duration::from_secs(5)));
     }
     watch.backoff.reset();
 
@@ -167,6 +194,8 @@ async fn poll_once(app: &AppHandle, watch: &mut Watch) -> Duration {
         progress: None,
         steps: vec![],
         run,
+        server_id: server.id.clone(),
+        server_name: server.name.clone(),
     };
 
     let mut running = vec![];
@@ -175,12 +204,8 @@ async fn poll_once(app: &AppHandle, watch: &mut Watch) -> Duration {
         match client.run_details(&run.name, &run.dag_run_id).await {
             Ok(details) => {
                 let history = history_for(&client, watch, &run.name).await;
-                running.push(RunView {
-                    url: client.run_url(&run.name, &run.dag_run_id),
-                    progress: Some(compute(&details, Some(&history), now)),
-                    steps: details.nodes,
-                    run,
-                });
+                let progress = Some(compute(&details, Some(&history), now));
+                running.push(RunView { progress, steps: details.nodes, ..plain(run) });
             }
             Err(_) => running.push(plain(run)),
         }
@@ -188,16 +213,11 @@ async fn poll_once(app: &AppHandle, watch: &mut Watch) -> Duration {
 
     let mut queued = vec![];
     for queue in snap.queues.iter().filter(|q| q.queued_count > 0) {
-        let items: Vec<RunView> = client
-            .queued_items(&queue.name)
-            .await
-            .unwrap_or_default()
-            .into_iter()
-            .filter(|r| visible(r))
-            .map(&plain)
-            .collect();
+        let items: Vec<RunView> =
+            client.queued_items(&queue.name).await.unwrap_or_default().into_iter().filter(|r| visible(r)).map(&plain).collect();
         if !items.is_empty() {
-            queued.push(QueueGroup { name: queue.name.clone(), items });
+            let name = if multi { format!("{} on {}", queue.name, server.name) } else { queue.name.clone() };
+            queued.push(QueueGroup { name, items });
         }
     }
 
@@ -215,12 +235,14 @@ async fn poll_once(app: &AppHandle, watch: &mut Watch) -> Duration {
         .cloned()
         .collect();
 
+    let where_ = |name: &str| if multi { format!("{name} on {}", server.name) } else { name.to_string() };
+
     // Nothing is announced on the first look, only changes after it.
     let failed_ids: HashSet<String> = snap.failed.iter().map(run_key).collect();
     if let Some(seen) = &watch.seen_failed {
         if config.notify_failure {
             for run in failed.iter().filter(|r| !seen.contains(&run_key(r))) {
-                notify(app, "Run failed", &run.name);
+                notify(app, "Run failed", &where_(&run.name));
             }
         }
     }
@@ -231,30 +253,99 @@ async fn poll_once(app: &AppHandle, watch: &mut Watch) -> Duration {
     if let Some(seen) = &watch.seen_running {
         if config.notify_completion {
             for (name, _) in seen.difference(&running_ids) {
-                notify(app, "Run finished", name);
+                notify(app, "Run finished", &where_(name));
             }
         }
     }
     watch.seen_running = Some(running_ids);
 
-    let queued_total: usize = queued.iter().map(|g: &QueueGroup| g.items.len()).sum();
-    let active = !running.is_empty() || queued_total > 0;
-    publish(
-        app,
-        View {
-            has_server: true,
-            server_name: Some(server.name),
-            server_url: Some(server.url),
-            connection: Connection::Ok,
-            version: snap.version,
-            failed: failed.into_iter().map(&plain).collect(),
-            running,
-            queued,
-            workers: snap.workers,
-            taken_at: now,
-        },
-    );
-    poll_interval(popover_open, active)
+    let active = !running.is_empty() || !queued.is_empty();
+    let view = ServerView {
+        connection: Connection::Ok,
+        version: snap.version,
+        failed: failed.into_iter().map(&plain).collect(),
+        running,
+        queued,
+        workers: snap.workers,
+    };
+    (view, poll_interval(popover_open, active))
+}
+
+fn merge(config: &Config, targets: &[Server], watches: &HashMap<String, Watch>) -> View {
+    let multi = targets.len() > 1;
+    let seen: Vec<(&Server, &ServerView)> =
+        targets.iter().filter_map(|s| watches.get(&s.id).and_then(|w| w.last.as_ref()).map(|v| (s, v))).collect();
+
+    let mut view = View::empty(true, Connection::Ok);
+    view.all_servers = multi;
+    view.allow_actions = config.allow_actions;
+    view.servers = config
+        .servers
+        .iter()
+        .map(|s| ServerChoice {
+            id: s.id.clone(),
+            name: s.name.clone(),
+            active: !config.show_all_servers && config.active().is_some_and(|a| a.id == s.id),
+        })
+        .collect();
+    if multi {
+        view.server_name = Some("All servers".to_string());
+    } else if let Some(server) = targets.first() {
+        view.server_name = Some(server.name.clone());
+        view.server_url = Some(server.url.clone());
+    }
+
+    let reachable = seen.iter().any(|(_, v)| v.connection == Connection::Ok);
+    if !reachable {
+        if let Some((_, v)) = seen.first() {
+            view.connection = v.connection.clone();
+        }
+    }
+    for (server, v) in &seen {
+        if v.connection != Connection::Ok && reachable {
+            view.problems.push(Problem { server_name: server.name.clone(), connection: v.connection.clone() });
+        }
+        view.failed.extend(v.failed.iter().cloned());
+        view.running.extend(v.running.iter().cloned());
+        view.queued.extend(v.queued.iter().cloned());
+        view.workers.extend(v.workers.iter().cloned());
+        if !multi {
+            view.version = v.version.clone();
+        }
+    }
+    view.failed.sort_by(|a, b| b.run.finished_at.cmp(&a.run.finished_at));
+    view.running.sort_by(|a, b| b.run.started_at.cmp(&a.run.started_at));
+    view
+}
+
+/// Looks at every server that is due, publishes the combined view, and returns how long to wait.
+async fn poll_once(app: &AppHandle, watches: &mut HashMap<String, Watch>) -> Duration {
+    let state = app.state::<AppState>();
+    let config = state.config.lock().unwrap().clone();
+    let popover_open = *state.popover_open.lock().unwrap();
+
+    let targets: Vec<Server> = if config.show_all_servers { config.servers.clone() } else { config.active().cloned().into_iter().collect() };
+    if targets.is_empty() {
+        publish(app, View::empty(false, Connection::Ok));
+        return poll_interval(popover_open, false);
+    }
+    watches.retain(|id, _| targets.iter().any(|s| &s.id == id));
+
+    let multi = targets.len() > 1;
+    let mut wait = Duration::from_secs(300);
+    for server in &targets {
+        let watch = watches.entry(server.id.clone()).or_default();
+        if watch.next.is_none_or(|next| Instant::now() >= next) {
+            let (view, delay) = poll_server(app, &config, server, multi, popover_open, watch).await;
+            watch.last = Some(view);
+            watch.next = Some(Instant::now() + delay);
+        }
+        if let Some(next) = watch.next {
+            wait = wait.min(next.saturating_duration_since(Instant::now()));
+        }
+    }
+    publish(app, merge(&config, &targets, watches));
+    wait.max(Duration::from_secs(1))
 }
 
 fn publish(app: &AppHandle, view: View) {
@@ -270,9 +361,11 @@ fn update_tray(state: &AppState, view: &View) {
     let running = view.running.len();
     let queued: usize = view.queued.iter().map(|g| g.items.len()).sum();
     // DAGs that are failing, not runs: one DAG failing every 15 minutes is one problem.
-    let failures = view.failed.iter().map(|f| &f.run.name).collect::<HashSet<_>>().len();
+    let failures = view.failed.iter().map(|f| (&f.server_id, &f.run.name)).collect::<HashSet<_>>().len();
 
     let glyph = match &view.connection {
+        // A server that can't be read might be busy: unknown is never drawn as idle.
+        Connection::Ok if running == 0 && !view.problems.is_empty() => Glyph::Unknown,
         Connection::Ok if running == 1 => {
             Glyph::Active { fraction: view.running[0].progress.as_ref().and_then(|p| p.fraction) }
         }
@@ -283,6 +376,9 @@ fn update_tray(state: &AppState, view: &View) {
 
     let tooltip = match &view.connection {
         Connection::Ok if !view.has_server => "Dagpeek: add a server".to_string(),
+        Connection::Ok if !view.problems.is_empty() => {
+            format!("Dagpeek: {running} running, {queued} queued, {failures} failed, {} unreachable", view.problems.len())
+        }
         Connection::Ok => format!("Dagpeek: {running} running, {queued} queued, {failures} failed"),
         Connection::Unreachable(_) => "Dagpeek: server unreachable".to_string(),
         Connection::AuthFailed => "Dagpeek: auth failed".to_string(),
@@ -309,23 +405,27 @@ fn update_tray(state: &AppState, view: &View) {
 }
 
 async fn poll_loop(app: AppHandle) {
-    let mut watch = Watch::default();
+    let mut watches: HashMap<String, Watch> = HashMap::new();
     let mut next = Instant::now();
     let mut last_tick = Utc::now();
     loop {
         let state = app.state::<AppState>();
         tokio::select! {
             _ = tokio::time::sleep(Duration::from_secs(1)) => {}
-            _ = state.refresh.notified() => next = Instant::now(),
+            _ = state.refresh.notified() => {
+                next = Instant::now();
+                watches.values_mut().for_each(|w| w.next = None);
+            }
         }
         // A one-second tick that took far longer means the machine slept: refresh at once.
         let wall = Utc::now();
         if (wall - last_tick).num_seconds() > 10 {
             next = Instant::now();
+            watches.values_mut().for_each(|w| w.next = None);
         }
         last_tick = wall;
         if Instant::now() >= next {
-            let wait = poll_once(&app, &mut watch).await;
+            let wait = poll_once(&app, &mut watches).await;
             next = Instant::now() + wait;
         }
     }
@@ -453,6 +553,7 @@ struct Prefs {
     notify_failure: bool,
     notify_completion: bool,
     menu_bar_style: MenuBarStyle,
+    allow_actions: bool,
 }
 
 #[tauri::command]
@@ -463,6 +564,7 @@ fn save_prefs(state: State<AppState>, prefs: Prefs) -> Result<(), String> {
         c.notify_failure = prefs.notify_failure;
         c.notify_completion = prefs.notify_completion;
         c.menu_bar_style = prefs.menu_bar_style;
+        c.allow_actions = prefs.allow_actions;
     })
 }
 
@@ -498,7 +600,35 @@ fn delete_server(state: State<AppState>, id: String) -> Result<(), String> {
 
 #[tauri::command]
 fn set_active_server(state: State<AppState>, id: String) -> Result<(), String> {
-    store(&state, |c| c.active_server = Some(id))
+    store(&state, |c| {
+        c.show_all_servers = id == ALL_SERVERS;
+        if id != ALL_SERVERS {
+            c.active_server = Some(id);
+        }
+    })
+}
+
+/// Stops, retries or dequeues a run. Refuses unless actions are turned on in Settings.
+#[tauri::command]
+async fn run_action(state: State<'_, AppState>, server_id: String, action: String, name: String, run_id: String) -> Result<(), String> {
+    let (server, allowed) = {
+        let config = state.config.lock().unwrap();
+        (config.servers.iter().find(|s| s.id == server_id).cloned(), config.allow_actions)
+    };
+    if !allowed {
+        return Err("Actions are off. Turn them on in Settings.".to_string());
+    }
+    let server = server.ok_or("That server is no longer set up.")?;
+    let client = Client::new(&server.url, server.auth().map_err(|e| e.to_string())?);
+    match action.as_str() {
+        "stop" => client.stop_run(&name, &run_id).await,
+        "retry" => client.retry_run(&name, &run_id).await,
+        "dequeue" => client.dequeue_run(&name, &run_id).await,
+        other => return Err(format!("Unknown action: {other}")),
+    }
+    .map_err(|e| e.to_string())?;
+    state.refresh.notify_one();
+    Ok(())
 }
 
 #[tauri::command]
@@ -604,7 +734,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             get_view, get_config, save_prefs, save_server, delete_server, set_active_server,
-            dismiss_failures, dismiss_failure, test_server, open_url, check_updates, quit
+            dismiss_failures, dismiss_failure, run_action, test_server, open_url, check_updates, quit
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Focused(false) = event {

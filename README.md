@@ -2,7 +2,7 @@
 
 See what your [Dagu](https://dagu.sh) server is doing without opening Dagu. A free menu bar app for Mac, by [Ailio](https://ailio.ca). Windows is on the way.
 
-It shows what's running, what's queued, what failed since you last looked, and how far each run has got.
+It shows what's running, what's queued, what failed since you last looked, and how far each run has got, across one Dagu server or all of them.
 
 ![The Dagpeek popover](docs/screenshot.png)
 
@@ -26,9 +26,11 @@ dagpeek runs
 dagpeek watch <dag>
 ```
 
-## What it doesn't do
+## Privacy and control
 
-Dagpeek only reads from Dagu, so it can't start, stop or retry anything. It talks to the servers you add and to its update feed. It has no account, analytics or telemetry.
+Dagpeek talks to the servers you add and to its update feed. It has no account, analytics or telemetry.
+
+It only reads from Dagu until you turn on actions in Settings. Then you can stop, retry or dequeue runs, and each one asks you to confirm.
 
 ## Build it
 

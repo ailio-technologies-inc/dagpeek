@@ -45,6 +45,10 @@
     queued: [],
     workers: [{ id: 'worker-1', healthStatus: 'healthy', busyPollers: 1, totalPollers: 4 }],
     takenAt: ago(0),
+    allServers: false,
+    servers: [],
+    problems: [],
+    allowActions: false,
   };
   window.__TAURI_INTERNALS__ = {
     transformCallback: () => 1,

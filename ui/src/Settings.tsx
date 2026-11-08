@@ -125,8 +125,6 @@ export function Settings({ firstRun, onDone }: { firstRun: boolean; onDone: () =
     }
   };
 
-  const many = config.servers.length > 1;
-
   return (
     <div className="settings">
       <header><h2>Settings</h2><button className="text done" onClick={() => { savePrefs({}); onDone(); }}>Done</button></header>
@@ -136,9 +134,6 @@ export function Settings({ firstRun, onDone }: { firstRun: boolean; onDone: () =
         <div className="set-group">
           {config.servers.map((s) => (
             <div key={s.id} className="set-row server-row">
-              {many && (
-                <input type="radio" name="active" aria-label={`Use ${s.name}`} checked={config.activeServer === s.id} onChange={() => { void api.setActive(s.id); setConfig({ ...config, activeServer: s.id }); }} />
-              )}
               <span className="server-text">
                 <span className="name">{s.name}</span>
                 <span className="meta">{s.url}</span>
@@ -182,6 +177,7 @@ export function Settings({ firstRun, onDone }: { firstRun: boolean; onDone: () =
           <Toggle label="Open at login" checked={autostart} onChange={(v) => { setAutostart(v); void (v ? enable() : disable()); }} />
           <Toggle label="Notify me when a run fails" checked={config.notifyFailure} onChange={(v) => savePrefs({ notifyFailure: v })} />
           <Toggle label="Notify me when a run finishes" checked={config.notifyCompletion} onChange={(v) => savePrefs({ notifyCompletion: v })} />
+          <Toggle label="Allow stop, retry and remove from queue" checked={config.allowActions} onChange={(v) => savePrefs({ allowActions: v })} />
         </div>
       </section>
 

@@ -68,19 +68,45 @@ impl Client {
         &self.base
     }
 
-    async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T, Error> {
-        let mut req = self.http.get(format!("{}/api/v1{}", self.base, path));
-        req = match &self.auth {
+    async fn send(&self, req: reqwest::RequestBuilder, path: &str) -> Result<reqwest::Response, Error> {
+        let req = match &self.auth {
             Auth::None => req,
             Auth::Basic { user, password } => req.basic_auth(user, Some(password)),
             Auth::Bearer(token) => req.bearer_auth(token),
         };
         let resp = req.send().await.map_err(|e| Error::Unreachable(e.to_string()))?;
         match resp.status().as_u16() {
-            200..=299 => {}
-            401 | 403 => return Err(Error::AuthFailed),
-            status => return Err(Error::Http { status, path: path.to_string() }),
+            200..=299 => Ok(resp),
+            401 | 403 => Err(Error::AuthFailed),
+            status => Err(Error::Http { status, path: path.to_string() }),
         }
+    }
+
+    fn url(&self, path: &str) -> String {
+        format!("{}/api/v1{}", self.base, path)
+    }
+
+    /// Stops a running DAG-run.
+    pub async fn stop_run(&self, name: &str, id: &str) -> Result<(), Error> {
+        let path = format!("/dag-runs/{}/{}/stop", encode(name), encode(id));
+        self.send(self.http.post(self.url(&path)), &path).await.map(|_| ())
+    }
+
+    /// Runs a finished DAG-run again.
+    pub async fn retry_run(&self, name: &str, id: &str) -> Result<(), Error> {
+        let path = format!("/dag-runs/{}/{}/retry", encode(name), encode(id));
+        let body = serde_json::json!({ "dagRunId": id });
+        self.send(self.http.post(self.url(&path)).json(&body), &path).await.map(|_| ())
+    }
+
+    /// Takes a queued DAG-run off its queue. Dagu exposes this as a GET.
+    pub async fn dequeue_run(&self, name: &str, id: &str) -> Result<(), Error> {
+        let path = format!("/dag-runs/{}/{}/dequeue", encode(name), encode(id));
+        self.send(self.http.get(self.url(&path)), &path).await.map(|_| ())
+    }
+
+    async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T, Error> {
+        let resp = self.send(self.http.get(self.url(path)), path).await?;
         let body = resp.bytes().await.map_err(|e| Error::Unreachable(e.to_string()))?;
         serde_json::from_slice(&body)
             .map_err(|e| Error::Decode { path: path.to_string(), message: e.to_string() })

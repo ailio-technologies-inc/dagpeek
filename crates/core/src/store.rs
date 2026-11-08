@@ -62,6 +62,10 @@ pub struct Config {
     /// The same, for one DAG dismissed on its own.
     pub failures_seen_by_dag: BTreeMap<String, DateTime<Utc>>,
     pub menu_bar_style: MenuBarStyle,
+    /// Show every server's runs together, not only the active one's.
+    pub show_all_servers: bool,
+    /// Whether stop, retry and remove from queue are offered. Off until someone turns it on.
+    pub allow_actions: bool,
 }
 
 impl Default for Config {
@@ -76,6 +80,8 @@ impl Default for Config {
             failures_seen_at: None,
             failures_seen_by_dag: BTreeMap::new(),
             menu_bar_style: MenuBarStyle::default(),
+            show_all_servers: false,
+            allow_actions: false,
         }
     }
 }

@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 
 export type AuthKind = 'none' | 'basic' | 'bearer';
+export type RunAction = 'stop' | 'retry' | 'dequeue';
 export type MenuBarStyle = 'icon' | 'failures' | 'progress' | 'words';
 
 export interface Server {
@@ -19,6 +20,7 @@ export interface Config {
   notifyFailure: boolean;
   notifyCompletion: boolean;
   menuBarStyle: MenuBarStyle;
+  allowActions: boolean;
 }
 
 export interface DagRun {
@@ -49,6 +51,8 @@ export interface RunView {
   progress: Progress | null;
   steps: StepNode[];
   url: string;
+  serverId: string;
+  serverName: string;
 }
 
 export interface Worker {
@@ -75,18 +79,24 @@ export interface View {
   queued: { name: string; items: RunView[] }[];
   workers: Worker[];
   takenAt: string;
+  allServers: boolean;
+  servers: { id: string; name: string; active: boolean }[];
+  problems: { serverName: string; connection: Connection }[];
+  allowActions: boolean;
 }
 
 export const api = {
   view: () => invoke<View>('get_view'),
   config: () => invoke<Config>('get_config'),
-  savePrefs: (prefs: Pick<Config, 'hiddenNames' | 'hiddenTags' | 'notifyFailure' | 'notifyCompletion' | 'menuBarStyle'>) =>
+  savePrefs: (prefs: Pick<Config, 'hiddenNames' | 'hiddenTags' | 'notifyFailure' | 'notifyCompletion' | 'menuBarStyle' | 'allowActions'>) =>
     invoke<void>('save_prefs', { prefs }),
   saveServer: (server: Server, secret: string | null) => invoke<void>('save_server', { server, secret }),
   deleteServer: (id: string) => invoke<void>('delete_server', { id }),
   setActive: (id: string) => invoke<void>('set_active_server', { id }),
   dismissFailures: () => invoke<void>('dismiss_failures'),
   dismissFailure: (name: string) => invoke<void>('dismiss_failure', { name }),
+  runAction: (serverId: string, action: RunAction, name: string, runId: string) =>
+    invoke<void>('run_action', { serverId, action, name, runId }),
   testServer: (url: string, kind: AuthKind, username: string | null, secret: string | null) =>
     invoke<string>('test_server', { url, kind, username, secret }),
   open: (url: string) => invoke<void>('open_url', { url }),

@@ -56,7 +56,8 @@ section > header, .settings > header { display: flex; justify-content: space-bet
 
 .cards { display: flex; flex-direction: column; gap: 6px; }
 .card { display: flex; flex-direction: column; gap: 6px; padding: 9px 10px; border-radius: 9px; background: var(--raised); box-shadow: inset 0 0 0 0.5px var(--line); }
-.card-head { display: flex; align-items: baseline; gap: 8px; width: 100%; }
+.card-top { display: flex; align-items: center; gap: 4px; }
+.card-head { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
 .card-head .name { flex: 1; font-size: 13px; }
 .detail { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--muted); }
 .step { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -71,7 +72,8 @@ section > header, .settings > header { display: flex; justify-content: space-bet
 @media (prefers-reduced-motion: reduce) { .bar.indeterminate::after { animation: none; width: 100%; opacity: 0.4; } .chev { transition: none; } }
 
 .steps { display: flex; flex-direction: column; gap: 3px; padding-top: 4px; border-top: 0.5px solid var(--line); margin-top: 2px; }
-.steps li { display: flex; align-items: center; gap: 8px; font-size: 12px; min-height: 19px; }
+.step-link { display: flex; align-items: center; gap: 8px; width: 100%; font-size: 12px; min-height: 22px; border-radius: 5px; }
+.step-link:hover { background: var(--hover); }
 .steps .name { flex: 1; font-weight: 400; }
 .open-link { padding-top: 3px; }
 
@@ -81,8 +83,22 @@ section > header, .settings > header { display: flex; justify-content: space-bet
 .row-main .name { flex: 0 1 auto; }
 .row-main .meta { margin-left: auto; }
 .count { flex: none; padding: 0 6px; border-radius: 8px; background: color-mix(in srgb, var(--fail) 15%, transparent); color: var(--fail); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 16px; }
-.dismiss { width: 0; opacity: 0; overflow: hidden; transition: opacity 80ms ease; }
-.row:hover .dismiss, .dismiss:focus-visible { width: 24px; opacity: 1; margin-right: 2px; }
+.hover-actions { display: none; flex: none; gap: 1px; margin: -3px 0; }
+.row:hover .hover-actions, .row:focus-within .hover-actions, .card:hover .hover-actions, .card:focus-within .hover-actions { display: flex; }
+.server-tag { flex: none; font-size: 11px; color: var(--muted); padding: 0 5px; border-radius: 5px; box-shadow: inset 0 0 0 0.5px var(--line); line-height: 15px; }
+.confirm { display: flex; align-items: center; gap: 10px; padding: 5px 6px; font-size: 12px; }
+.question, .error { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.error { color: var(--fail); }
+.act { padding: 2px 10px; border-radius: 6px; background: var(--ink); color: var(--glass); font-weight: 600; }
+.act:disabled { opacity: 0.6; }
+.problem { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 7px; background: color-mix(in srgb, var(--fail) 12%, transparent); font-size: 12px; }
+.server-menu { flex: none; display: flex; flex-direction: column; padding: 4px 6px; border-top: 0.5px solid var(--line); }
+.server-menu button { display: flex; justify-content: space-between; padding: 5px 8px; border-radius: 6px; }
+.server-menu button:hover { background: var(--hover); }
+.tick { color: var(--go); }
+.switcher { border-radius: 6px; padding: 3px 6px; margin-left: -6px; }
+.switcher:hover { background: var(--hover); }
+.server-name { overflow: hidden; text-overflow: ellipsis; }
 
 .runs { display: flex; flex-direction: column; padding: 0 0 4px 21px; }
 .run-link { display: flex; justify-content: space-between; width: 100%; padding: 3px 6px; border-radius: 6px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }

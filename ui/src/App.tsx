@@ -1,7 +1,7 @@
 import { listen } from '@tauri-apps/api/event';
 import { LogicalSize, getCurrentWindow } from '@tauri-apps/api/window';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { api, formatAgo, formatDuration, secondsBetween, type RunView, type View } from './api';
+import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { api, formatAgo, formatDuration, secondsBetween, type RunAction, type RunView, type View } from './api';
 import { Settings } from './Settings';
 
 const WIDTH = 380;
@@ -49,6 +49,69 @@ const OPEN = 'M6.5 3H3.5A1 1 0 0 0 2.5 4v8.5a1 1 0 0 0 1 1H12a1 1 0 0 0 1-1v-3M9
 const GEAR = 'M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2zM15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z';
 const POWER = 'M8 2v5.5M11.6 4.2a5.2 5.2 0 1 1-7.2 0';
 const CLOSE = 'M4 4l8 8M12 4l-8 8';
+const STOP = 'M4.5 4.5h7v7h-7z';
+const RETRY = 'M13 8a5 5 0 1 1-1.5-3.5M13 2.5v3h-3';
+
+const ACTIONS: Record<RunAction, { verb: string; icon: string; question: (name: string) => string }> = {
+  stop: { verb: 'Stop', icon: STOP, question: (n) => `Stop ${n}?` },
+  retry: { verb: 'Retry', icon: RETRY, question: (n) => `Retry ${n}?` },
+  dequeue: { verb: 'Remove', icon: CLOSE, question: (n) => `Remove ${n} from the queue?` },
+};
+
+/** An action button and the confirmation it asks for. Nothing happens on the first click. */
+function useRunAction(item: RunView, action: RunAction, enabled: boolean): { button: ReactNode; bar: ReactNode } {
+  const [phase, setPhase] = useState<'idle' | 'confirm' | 'busy'>('idle');
+  const [error, setError] = useState('');
+  if (!enabled) return { button: null, bar: null };
+  const a = ACTIONS[action];
+
+  const go = async () => {
+    setPhase('busy');
+    setError('');
+    try {
+      await api.runAction(item.serverId, action, item.run.name, item.run.dagRunId);
+      setPhase('idle');
+    } catch (e) {
+      setError(String(e));
+      setPhase('idle');
+    }
+  };
+
+  return {
+    button: (
+      <button className="icon-btn" title={a.verb} aria-label={`${a.verb} ${item.run.name}`} onClick={() => { setError(''); setPhase('confirm'); }}>
+        <Icon d={a.icon} />
+      </button>
+    ),
+    bar:
+      phase !== 'idle' || error ? (
+        <div className="confirm">
+          {error ? (
+            <>
+              <span className="error">{error}</span>
+              <button className="text" onClick={() => setError('')}>OK</button>
+            </>
+          ) : (
+            <>
+              <span className="question">{a.question(item.run.name)}</span>
+              <button className="text" disabled={phase === 'busy'} onClick={() => setPhase('idle')}>Cancel</button>
+              <button className="act" disabled={phase === 'busy'} onClick={() => void go()}>{phase === 'busy' ? 'Working…' : a.verb}</button>
+            </>
+          )}
+        </div>
+      ) : null,
+  };
+}
+
+function OpenButton({ url, name }: { url: string; name: string }) {
+  return (
+    <button className="icon-btn" title="Open in Dagu" aria-label={`Open ${name} in Dagu`} onClick={() => void api.open(url)}>
+      <Icon d={OPEN} />
+    </button>
+  );
+}
+
+const ServerTag = ({ view, name }: { view: View; name: string }) => (view.allServers ? <span className="server-tag">{name}</span> : null);
 
 function Bar({ fraction }: { fraction: number | null }) {
   return (
@@ -58,17 +121,25 @@ function Bar({ fraction }: { fraction: number | null }) {
   );
 }
 
-function Running({ item, now }: { item: RunView; now: number }) {
+function Running({ item, view, now }: { item: RunView; view: View; now: number }) {
   const [open, setOpen] = useState(false);
+  const stop = useRunAction(item, 'stop', view.allowActions);
   const p = item.progress;
   const elapsed = secondsBetween(item.run.startedAt, null, now);
   return (
     <li className="card">
-      <button className="card-head" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <span className="name">{item.run.name}</span>
-        <span className="meta">{elapsed !== null && formatDuration(elapsed)}</span>
-        <Chevron open={open} />
-      </button>
+      <div className="card-top">
+        <button className="card-head" onClick={() => setOpen(!open)} aria-expanded={open}>
+          <span className="name">{item.run.name}</span>
+          <ServerTag view={view} name={item.serverName} />
+          <span className="meta">{elapsed !== null && formatDuration(elapsed)}</span>
+          <Chevron open={open} />
+        </button>
+        <span className="hover-actions">
+          <OpenButton url={item.url} name={item.run.name} />
+          {stop.button}
+        </span>
+      </div>
       <Bar fraction={p ? p.fraction : null} />
       {p && (
         <div className="detail">
@@ -79,49 +150,53 @@ function Running({ item, now }: { item: RunView; now: number }) {
           </span>
         </div>
       )}
+      {stop.bar}
       {open && (
         <ul className="steps">
           {item.steps.map((n) => {
             const d = secondsBetween(n.startedAt, n.finishedAt, now);
             return (
               <li key={n.step.name}>
-                <i className={`dot s-${n.statusLabel}`} />
-                <span className="name">{n.step.name}</span>
-                <span className="meta">{d !== null ? formatDuration(d) : ''}</span>
+                <button className="step-link" title="Open this step in Dagu" onClick={() => void api.open(`${item.url}?step=${encodeURIComponent(n.step.name)}`)}>
+                  <i className={`dot s-${n.statusLabel}`} />
+                  <span className="name">{n.step.name}</span>
+                  <span className="meta">{d !== null ? formatDuration(d) : ''}</span>
+                </button>
               </li>
             );
           })}
-          <li className="open-link">
-            <button className="text" onClick={() => void api.open(item.url)}>Open in Dagu</button>
-          </li>
         </ul>
       )}
     </li>
   );
 }
 
-function FailedGroup({ name, runs, now }: { name: string; runs: RunView[]; now: number }) {
+function FailedGroup({ runs, view, now }: { runs: RunView[]; view: View; now: number }) {
   const [open, setOpen] = useState(false);
   const latest = runs[0]!;
+  const name = latest.run.name;
+  const retry = useRunAction(latest, 'retry', view.allowActions);
   const many = runs.length > 1;
   const ago = (r: RunView) => (r.run.finishedAt ? formatAgo(secondsBetween(r.run.finishedAt, null, now) ?? 0) : '');
   return (
     <li className="group">
       <div className="row">
-        <button
-          className="row-main"
-          onClick={() => (many ? setOpen(!open) : void api.open(latest.url))}
-          aria-expanded={many ? open : undefined}
-        >
+        <button className="row-main" onClick={() => (many ? setOpen(!open) : void api.open(latest.url))} aria-expanded={many ? open : undefined}>
           <i className="dot s-failed" />
           <span className="name">{name}</span>
           {many && <span className="count">{runs.length}</span>}
+          <ServerTag view={view} name={latest.serverName} />
           <span className="meta">{ago(latest)}</span>
         </button>
-        <button className="icon-btn dismiss" title="Dismiss" aria-label={`Dismiss ${name}`} onClick={() => void api.dismissFailure(name)}>
-          <Icon d={CLOSE} />
-        </button>
+        <span className="hover-actions">
+          <OpenButton url={latest.url} name={name} />
+          {retry.button}
+          <button className="icon-btn" title="Dismiss" aria-label={`Dismiss ${name}`} onClick={() => void api.dismissFailure(name)}>
+            <Icon d={CLOSE} />
+          </button>
+        </span>
       </div>
+      {retry.bar}
       {open && (
         <ul className="runs">
           {runs.map((r) => (
@@ -134,6 +209,25 @@ function FailedGroup({ name, runs, now }: { name: string; runs: RunView[]; now: 
           ))}
         </ul>
       )}
+    </li>
+  );
+}
+
+function Queued({ item, position, view }: { item: RunView; position: number; view: View }) {
+  const remove = useRunAction(item, 'dequeue', view.allowActions);
+  return (
+    <li>
+      <div className="row">
+        <span className="row-main">
+          <span className="name">{item.run.name}</span>
+          <span className="meta">#{position}</span>
+        </span>
+        <span className="hover-actions">
+          <OpenButton url={item.url} name={item.run.name} />
+          {remove.button}
+        </span>
+      </div>
+      {remove.bar}
     </li>
   );
 }
@@ -163,7 +257,10 @@ function Board({ view, now }: { view: View; now: number }) {
   const [showWorkers, setShowWorkers] = useState(false);
   const failedGroups = useMemo(() => {
     const groups = new Map<string, RunView[]>();
-    for (const f of view.failed) groups.set(f.run.name, [...(groups.get(f.run.name) ?? []), f]);
+    for (const f of view.failed) {
+      const key = `${f.serverId}/${f.run.name}`;
+      groups.set(key, [...(groups.get(key) ?? []), f]);
+    }
     return [...groups.entries()];
   }, [view.failed]);
   const queuedCount = view.queued.reduce((n, g) => n + g.items.length, 0);
@@ -172,7 +269,13 @@ function Board({ view, now }: { view: View; now: number }) {
   const total = view.workers.reduce((n, w) => n + w.totalPollers, 0);
   return (
     <div className="board">
-      {nothing && (
+      {view.problems.map((p) => (
+        <div className="problem" key={p.serverName}>
+          <i className="dot s-failed" />
+          {p.serverName}: {p.connection.state === 'authFailed' ? 'auth failed' : "can't be reached"}
+        </div>
+      ))}
+      {nothing && view.problems.length === 0 && (
         <div className="state quiet">
           <i className="state-dot" />
           <h2>All quiet</h2>
@@ -182,20 +285,13 @@ function Board({ view, now }: { view: View; now: number }) {
       {view.running.length > 0 && (
         <section>
           <header><h3>Running</h3><span className="meta">{view.running.length}</span></header>
-          <ul className="cards">{view.running.map((r) => <Running key={r.run.dagRunId} item={r} now={now} />)}</ul>
+          <ul className="cards">{view.running.map((r) => <Running key={`${r.serverId}/${r.run.dagRunId}`} item={r} view={view} now={now} />)}</ul>
         </section>
       )}
       {view.queued.map((g) => (
         <section key={g.name}>
           <header><h3>Queued in {g.name}</h3><span className="meta">{g.items.length}</span></header>
-          <ol>
-            {g.items.map((q, i) => (
-              <li key={q.run.dagRunId} className="plain">
-                <span className="name">{q.run.name}</span>
-                <span className="meta">#{i + 1}</span>
-              </li>
-            ))}
-          </ol>
+          <ol>{g.items.map((q, i) => <Queued key={`${q.serverId}/${q.run.dagRunId}`} item={q} position={i + 1} view={view} />)}</ol>
         </section>
       ))}
       {failedGroups.length > 0 && (
@@ -204,7 +300,7 @@ function Board({ view, now }: { view: View; now: number }) {
             <h3>Failed</h3>
             <button className="text" onClick={() => void api.dismissFailures()}>Dismiss all</button>
           </header>
-          <ul>{failedGroups.map(([name, runs]) => <FailedGroup key={name} name={name} runs={runs} now={now} />)}</ul>
+          <ul>{failedGroups.map(([key, runs]) => <FailedGroup key={key} runs={runs} view={view} now={now} />)}</ul>
         </section>
       )}
       {view.workers.length > 0 && (
@@ -230,9 +326,26 @@ function Board({ view, now }: { view: View; now: number }) {
   );
 }
 
+function ServerMenu({ view, onPick }: { view: View; onPick: () => void }) {
+  const pick = (id: string) => { void api.setActive(id); onPick(); };
+  return (
+    <div className="server-menu" role="menu">
+      <button role="menuitemradio" aria-checked={view.allServers} onClick={() => pick('*')}>
+        <span>All servers</span>{view.allServers && <span className="tick">✓</span>}
+      </button>
+      {view.servers.map((s) => (
+        <button key={s.id} role="menuitemradio" aria-checked={s.active} onClick={() => pick(s.id)}>
+          <span>{s.name}</span>{s.active && <span className="tick">✓</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function App() {
   const [view, setView] = useState<View | null>(null);
   const [settings, setSettings] = useState(false);
+  const [switching, setSwitching] = useState(false);
   const now = useNow();
   const fit = useFitWindow();
 
@@ -244,6 +357,7 @@ export function App() {
 
   const showSettings = view && (settings || !view.hasServer);
   const ok = view?.connection.state === 'ok';
+  const canSwitch = (view?.servers.length ?? 0) > 1;
 
   return (
     <main className="popover" ref={fit}>
@@ -251,11 +365,20 @@ export function App() {
       {view && !showSettings && (
         <>
           {ok ? <Board view={view} now={now} /> : <Unknown view={view} />}
+          {switching && canSwitch && <ServerMenu view={view} onPick={() => setSwitching(false)} />}
           <footer>
-            <span className="server" title={view.serverUrl ?? ''}>
-              <i className={ok ? 'dot s-succeeded' : 'dot s-failed'} />
-              {view.serverName}
-            </span>
+            {canSwitch ? (
+              <button className="server switcher" title="Switch server" aria-expanded={switching} onClick={() => setSwitching(!switching)}>
+                <i className={ok ? 'dot s-succeeded' : 'dot s-failed'} />
+                <span className="server-name">{view.serverName}</span>
+                <Chevron open={switching} />
+              </button>
+            ) : (
+              <span className="server" title={view.serverUrl ?? ''}>
+                <i className={ok ? 'dot s-succeeded' : 'dot s-failed'} />
+                {view.serverName}
+              </span>
+            )}
             <span className="actions">
               {view.serverUrl && (
                 <button className="icon-btn" title="Open Dagu" aria-label="Open Dagu" onClick={() => void api.open(view.serverUrl!)}><Icon d={OPEN} /></button>
