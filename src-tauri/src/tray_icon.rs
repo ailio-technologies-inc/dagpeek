@@ -20,8 +20,10 @@ const FONT: [[u8; 5]; 10] = [
 pub enum Glyph {
     /// Connected, nothing to report.
     Idle,
-    /// Runs in progress. `fraction` is set when exactly one run has a known position.
+    /// Runs in progress, shown as one ring. `fraction` is where it has got, when known.
     Active { fraction: Option<f64> },
+    /// Two to four runs, one arc each. The first `count` entries are used.
+    Segments { runs: [Option<f64>; 4], count: usize },
     /// Not known: unreachable or refused. Never drawn as idle.
     Unknown,
 }
@@ -118,6 +120,18 @@ fn draw_ring(c: &mut Canvas, glyph: Glyph) {
             c.ring(radius, width, 0.3, |_| true);
             c.ring(radius, width, 1.0, |a| a <= 0.3);
         }
+        Glyph::Segments { runs, count } => {
+            let gap = 0.045;
+            for (i, run) in runs.iter().take(count).enumerate() {
+                let start = i as f64 / count as f64 + gap / 2.0;
+                let span = 1.0 / count as f64 - gap;
+                c.ring(radius, width, 0.3, move |a| a >= start && a <= start + span);
+                if let Some(f) = run {
+                    let end = start + span * f.clamp(0.0, 1.0);
+                    c.ring(radius, width, 1.0, move |a| a >= start && a <= end);
+                }
+            }
+        }
         // A broken ring: unknown must not read as idle.
         Glyph::Unknown => c.ring(radius, width, 1.0, |a| (a * 8.0).fract() < 0.5),
     }
@@ -201,6 +215,15 @@ mod tests {
         let low = alpha_sum(&draw_macos(Glyph::Active { fraction: Some(0.1) }, false));
         let high = alpha_sum(&draw_macos(Glyph::Active { fraction: Some(0.9) }, false));
         assert!(high > low);
+    }
+
+    #[test]
+    fn each_run_gets_an_arc_that_fills_on_its_own() {
+        let two = |a, b| alpha_sum(&draw_macos(Glyph::Segments { runs: [Some(a), Some(b), None, None], count: 2 }, false));
+        assert!(two(1.0, 0.7) > two(1.0, 0.1));
+        assert!(two(0.9, 0.5) > two(0.1, 0.5));
+        let unknown = alpha_sum(&draw_macos(Glyph::Segments { runs: [None; 4], count: 2 }, false));
+        assert!(two(0.2, 0.2) > unknown, "a run with no known position stays dim");
     }
 
     #[test]

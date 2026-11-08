@@ -84,6 +84,7 @@ export interface View {
   servers: { id: string; name: string; active: boolean }[];
   problems: { serverName: string; connection: Connection }[];
   allowActions: boolean;
+  termsAccepted: boolean;
 }
 
 export const api = {
@@ -96,6 +97,7 @@ export const api = {
   setActive: (id: string) => invoke<void>('set_active_server', { id }),
   dismissFailures: () => invoke<void>('dismiss_failures'),
   dismissFailure: (name: string) => invoke<void>('dismiss_failure', { name }),
+  acceptTerms: (usageStats: boolean) => invoke<void>('accept_terms', { usageStats }),
   runAction: (serverId: string, action: RunAction, name: string, runId: string) =>
     invoke<void>('run_action', { serverId, action, name, runId }),
   testServer: (url: string, kind: AuthKind, username: string | null, secret: string | null) =>

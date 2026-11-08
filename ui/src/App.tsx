@@ -2,7 +2,7 @@ import { listen } from '@tauri-apps/api/event';
 import { LogicalSize, getCurrentWindow } from '@tauri-apps/api/window';
 import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { api, formatAgo, formatDuration, secondsBetween, type RunAction, type RunView, type View } from './api';
-import { Settings } from './Settings';
+import { Settings, Toggle } from './Settings';
 
 const WIDTH = 380;
 const MAX_HEIGHT = 620;
@@ -143,7 +143,7 @@ function Running({ item, view, now }: { item: RunView; view: View; now: number }
       <Bar fraction={p ? p.fraction : null} />
       {p && (
         <div className="detail">
-          <span className="step">{p.currentStep ?? 'Starting'}</span>
+          <span className="step">{p.currentStep ?? (p.total > 0 && p.done >= p.total ? 'Finishing' : 'Starting')}</span>
           <span className="meta">
             {p.done} of {p.total}
             {p.etaSecs !== null && `, about ${formatDuration(p.etaSecs)} left`}
@@ -326,6 +326,22 @@ function Board({ view, now }: { view: View; now: number }) {
   );
 }
 
+function Terms() {
+  const [share, setShare] = useState(true);
+  return (
+    <div className="settings">
+      <header><h2>Welcome to Dagpeek</h2></header>
+      <p className="note">By continuing, you agree to the <button className="inline-link" onClick={() => void api.open('https://dagpeek.com/terms')}>terms and privacy notice</button>.</p>
+      <p className="note">Once a day Dagpeek sends a usage count to Google Analytics: a random ID, the app version and your OS. It never includes your servers, DAGs or runs.</p>
+      <div className="set-group"><Toggle label="Share anonymous usage count" checked={share} onChange={setShare} /></div>
+      <div className="buttons">
+        <button type="button" onClick={() => void api.quit()}>Quit</button>
+        <button type="button" className="primary" onClick={() => void api.acceptTerms(share)}>Accept and continue</button>
+      </div>
+    </div>
+  );
+}
+
 function ServerMenu({ view, onPick }: { view: View; onPick: () => void }) {
   const pick = (id: string) => { void api.setActive(id); onPick(); };
   return (
@@ -361,8 +377,9 @@ export function App() {
 
   return (
     <main className="popover" ref={fit}>
-      {showSettings && <Settings firstRun={!view.hasServer} onDone={() => setSettings(false)} />}
-      {view && !showSettings && (
+      {view && !view.termsAccepted && <Terms />}
+      {view?.termsAccepted && showSettings && <Settings firstRun={!view.hasServer} onDone={() => setSettings(false)} />}
+      {view?.termsAccepted && !showSettings && (
         <>
           {ok ? <Board view={view} now={now} /> : <Unknown view={view} />}
           {switching && canSwitch && <ServerMenu view={view} onPick={() => setSwitching(false)} />}

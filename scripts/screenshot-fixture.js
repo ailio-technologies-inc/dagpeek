@@ -49,6 +49,7 @@
     servers: [],
     problems: [],
     allowActions: false,
+    termsAccepted: true,
   };
   window.__TAURI_INTERNALS__ = {
     transformCallback: () => 1,

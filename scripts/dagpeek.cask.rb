@@ -13,7 +13,7 @@ cask "dagpeek" do
   end
 
   auto_updates true
-  depends_on macos: ">= :ventura"
+  depends_on macos: :ventura
 
   app "Dagpeek.app"
   binary "#{appdir}/Dagpeek.app/Contents/MacOS/dagpeek"

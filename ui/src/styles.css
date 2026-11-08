@@ -153,6 +153,7 @@ footer { flex: none; display: flex; justify-content: space-between; align-items:
 .server-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .server-text .meta { overflow: hidden; text-overflow: ellipsis; }
 .status-note { padding: 0 4px; }
+.inline-link { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; font: inherit; }
 .radio-label { display: flex; align-items: center; gap: 8px; }
 .radio-label input { margin: 0; accent-color: var(--go); }
 

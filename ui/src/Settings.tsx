@@ -13,7 +13,7 @@ const STYLES: { id: MenuBarStyle; label: string; example: string }[] = [
 
 const list = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean);
 
-function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+export function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <label className="set-row toggle">
       <span>{label}</span>

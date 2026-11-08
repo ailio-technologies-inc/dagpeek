@@ -72,6 +72,8 @@ pub struct Config {
     pub install_id: Option<String>,
     /// The UTC day the last count went out, so there is at most one a day.
     pub usage_sent_on: Option<String>,
+    /// When the first-run terms were accepted. Nothing is counted before this.
+    pub terms_accepted_at: Option<DateTime<Utc>>,
 }
 
 impl Default for Config {
@@ -91,6 +93,7 @@ impl Default for Config {
             usage_stats: true,
             install_id: None,
             usage_sent_on: None,
+            terms_accepted_at: None,
         }
     }
 }

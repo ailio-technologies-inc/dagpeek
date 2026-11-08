@@ -80,6 +80,7 @@ struct View {
     servers: Vec<ServerChoice>,
     problems: Vec<Problem>,
     allow_actions: bool,
+    terms_accepted: bool,
 }
 
 impl View {
@@ -99,6 +100,7 @@ impl View {
             servers: vec![],
             problems: vec![],
             allow_actions: false,
+            terms_accepted: false,
         }
     }
 }
@@ -348,8 +350,9 @@ async fn poll_once(app: &AppHandle, watches: &mut HashMap<String, Watch>) -> Dur
     wait.max(Duration::from_secs(1))
 }
 
-fn publish(app: &AppHandle, view: View) {
+fn publish(app: &AppHandle, mut view: View) {
     let state = app.state::<AppState>();
+    view.terms_accepted = state.config.lock().unwrap().terms_accepted_at.is_some();
     update_tray(&state, &view);
     let _ = app.emit("view", &view);
     *state.view.lock().unwrap() = view;
@@ -363,13 +366,21 @@ fn update_tray(state: &AppState, view: &View) {
     // DAGs that are failing, not runs: one DAG failing every 15 minutes is one problem.
     let failures = view.failed.iter().map(|f| (&f.server_id, &f.run.name)).collect::<HashSet<_>>().len();
 
+    let fractions: Vec<Option<f64>> = view.running.iter().map(|r| r.progress.as_ref().and_then(|p| p.fraction)).collect();
     let glyph = match &view.connection {
         // A server that can't be read might be busy: unknown is never drawn as idle.
         Connection::Ok if running == 0 && !view.problems.is_empty() => Glyph::Unknown,
-        Connection::Ok if running == 1 => {
-            Glyph::Active { fraction: view.running[0].progress.as_ref().and_then(|p| p.fraction) }
+        Connection::Ok if running == 1 => Glyph::Active { fraction: fractions.first().copied().flatten() },
+        Connection::Ok if (2..=4).contains(&running) => {
+            let mut runs = [None; 4];
+            runs[..running].copy_from_slice(&fractions[..running]);
+            Glyph::Segments { runs, count: running }
         }
-        Connection::Ok if running > 1 => Glyph::Active { fraction: None },
+        Connection::Ok if running > 4 => {
+            // Too many arcs to read: one ring, the average of what's known.
+            let known: Vec<f64> = fractions.iter().copied().flatten().collect();
+            Glyph::Active { fraction: (!known.is_empty()).then(|| known.iter().sum::<f64>() / known.len() as f64) }
+        }
         Connection::Ok => Glyph::Idle,
         _ => Glyph::Unknown,
     };
@@ -509,6 +520,30 @@ fn hide_popover(app: &AppHandle) {
     *state.hidden_at.lock().unwrap() = Some(Instant::now());
 }
 
+fn show_popover(app: &AppHandle, window: &WebviewWindow, rect: Rect) {
+    place_popover(window, rect);
+    let _ = window.show();
+    let _ = window.set_focus();
+    let state = app.state::<AppState>();
+    *state.popover_open.lock().unwrap() = true;
+    state.refresh.notify_one();
+    #[cfg(target_os = "macos")]
+    tauri::async_runtime::spawn(close_on_outside_click(app.clone()));
+}
+
+/// Opens the popover by itself on first run, so the terms are seen.
+async fn open_for_terms(app: AppHandle) {
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+    let state = app.state::<AppState>();
+    if state.config.lock().unwrap().terms_accepted_at.is_some() {
+        return;
+    }
+    let rect = state.tray.lock().unwrap().as_ref().and_then(|t| t.rect().ok().flatten());
+    if let (Some(rect), Some(window)) = (rect, app.get_webview_window("popover")) {
+        show_popover(&app, &window, rect);
+    }
+}
+
 fn toggle_popover(app: &AppHandle, rect: Rect) {
     let Some(window) = app.get_webview_window("popover") else { return };
     let state = app.state::<AppState>();
@@ -518,13 +553,7 @@ fn toggle_popover(app: &AppHandle, rect: Rect) {
         hide_popover(app);
         return;
     }
-    place_popover(&window, rect);
-    let _ = window.show();
-    let _ = window.set_focus();
-    *state.popover_open.lock().unwrap() = true;
-    state.refresh.notify_one();
-    #[cfg(target_os = "macos")]
-    tauri::async_runtime::spawn(close_on_outside_click(app.clone()));
+    show_popover(app, &window, rect);
 }
 
 #[tauri::command]
@@ -639,6 +668,14 @@ fn dismiss_failures(state: State<AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn accept_terms(state: State<AppState>, usage_stats: bool) -> Result<(), String> {
+    store(&state, |c| {
+        c.terms_accepted_at = Some(Utc::now());
+        c.usage_stats = usage_stats;
+    })
+}
+
+#[tauri::command]
 fn dismiss_failure(state: State<AppState>, name: String) -> Result<(), String> {
     store(&state, |c| {
         c.failures_seen_by_dag.insert(name, Utc::now());
@@ -705,7 +742,7 @@ async fn usage_loop(app: AppHandle) {
         let today = Utc::now().format("%Y-%m-%d").to_string();
         let due = {
             let mut config = state.config.lock().unwrap();
-            if config.usage_stats && config.usage_sent_on.as_deref() != Some(today.as_str()) {
+            if config.terms_accepted_at.is_some() && config.usage_stats && config.usage_sent_on.as_deref() != Some(today.as_str()) {
                 let id = config.install_id.get_or_insert_with(|| uuid::Uuid::new_v4().to_string()).clone();
                 Some(id)
             } else {
@@ -721,7 +758,7 @@ async fn usage_loop(app: AppHandle) {
                 let _ = config.save();
             }
         }
-        tokio::time::sleep(Duration::from_secs(60 * 60)).await;
+        tokio::time::sleep(Duration::from_secs(5 * 60)).await;
     }
 }
 
@@ -764,7 +801,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             get_view, get_config, save_prefs, save_server, delete_server, set_active_server,
-            dismiss_failures, dismiss_failure, run_action, test_server, open_url, check_updates, quit
+            dismiss_failures, dismiss_failure, accept_terms, run_action, test_server, open_url, check_updates, quit
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Focused(false) = event {
@@ -805,6 +842,7 @@ fn main() {
             tauri::async_runtime::spawn(poll_loop(app.handle().clone()));
             tauri::async_runtime::spawn(update_loop(app.handle().clone()));
             tauri::async_runtime::spawn(usage_loop(app.handle().clone()));
+            tauri::async_runtime::spawn(open_for_terms(app.handle().clone()));
             Ok(())
         })
         .run(tauri::generate_context!())
