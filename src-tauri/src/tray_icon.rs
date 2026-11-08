@@ -76,10 +76,14 @@ impl Canvas {
     }
 
     fn dot(&mut self, cx: f64, cy: f64, radius: f64, color: [u8; 3]) {
+        self.dot_alpha(cx, cy, radius, color, 1.0);
+    }
+
+    fn dot_alpha(&mut self, cx: f64, cy: f64, radius: f64, color: [u8; 3], alpha: f64) {
         for y in 0..self.size {
             for x in 0..self.w {
                 let d = ((x as f64 + 0.5 - cx).powi(2) + (y as f64 + 0.5 - cy).powi(2)).sqrt();
-                self.put(x, y, color, (radius - d + 0.5).clamp(0.0, 1.0));
+                self.put(x, y, color, (radius - d + 0.5).clamp(0.0, 1.0) * alpha);
             }
         }
     }
@@ -129,16 +133,23 @@ fn draw_ring(c: &mut Canvas, glyph: Glyph) {
     }
 }
 
-/// A template image for the macOS menu bar, at 2x of its 22 pt height.
-pub fn draw_macos(glyph: Glyph, failing: bool) -> Drawn {
-    let mut c = Canvas::new(44, [0, 0, 0]);
+/// The status dot's meaning, as a colour.
+pub const GREEN: [u8; 3] = [48, 209, 88];
+pub const YELLOW: [u8; 3] = [255, 196, 10];
+pub const RED: [u8; 3] = [255, 69, 58];
+
+/// The macOS menu bar icon, at 2x of its 22 pt height. Colour rules out a template image, so
+/// the ring is drawn in the ink that suits the menu bar it sits on.
+pub fn draw_macos(glyph: Glyph, dot: Option<[u8; 3]>, dot_alpha: f64, dark_bar: bool) -> Drawn {
+    let ink = if dark_bar { [255, 255, 255] } else { [0, 0, 0] };
+    let mut c = Canvas::new(44, ink);
     draw_ring(&mut c, glyph);
     if glyph == Glyph::Idle {
-        c.dot(22.0, 22.0, 5.0, [0, 0, 0]);
+        c.dot(22.0, 22.0, 5.0, ink);
     }
-    if failing {
+    if let Some(color) = dot {
         c.cut(35.0, 9.0, 10.5);
-        c.dot(35.0, 9.0, 7.0, [0, 0, 0]);
+        c.dot_alpha(35.0, 9.0, 7.0, color, dot_alpha);
     }
     Drawn { rgba: c.px, width: 44, size: 44 }
 }
@@ -204,15 +215,17 @@ mod tests {
 
     #[test]
     fn progress_ring_fills_with_the_fraction() {
-        let low = alpha_sum(&draw_macos(Glyph::Active { fraction: Some(0.1) }, false));
-        let high = alpha_sum(&draw_macos(Glyph::Active { fraction: Some(0.9) }, false));
+        let low = alpha_sum(&draw_macos(Glyph::Active { fraction: Some(0.1) }, None, 1.0, true));
+        let high = alpha_sum(&draw_macos(Glyph::Active { fraction: Some(0.9) }, None, 1.0, true));
         assert!(high > low);
     }
 
     #[test]
     fn unknown_differs_from_idle() {
-        assert_ne!(draw_macos(Glyph::Unknown, false).rgba, draw_macos(Glyph::Idle, false).rgba);
-        assert_ne!(draw_macos(Glyph::Idle, true).rgba, draw_macos(Glyph::Idle, false).rgba);
+        assert_ne!(draw_macos(Glyph::Unknown, None, 1.0, true).rgba, draw_macos(Glyph::Idle, None, 1.0, true).rgba);
+        assert_ne!(draw_macos(Glyph::Idle, Some(RED), 1.0, true).rgba, draw_macos(Glyph::Idle, None, 1.0, true).rgba);
+        assert_ne!(draw_macos(Glyph::Idle, None, 1.0, true).rgba, draw_macos(Glyph::Idle, None, 1.0, false).rgba, "ink follows the bar");
+        assert_ne!(draw_macos(Glyph::Idle, Some(GREEN), 0.7, true).rgba, draw_macos(Glyph::Idle, Some(GREEN), 1.0, true).rgba, "the pulse changes the dot");
         assert_ne!(draw_windows(Glyph::Unknown, 0, 0, true).rgba, draw_windows(Glyph::Idle, 0, 0, true).rgba);
     }
 

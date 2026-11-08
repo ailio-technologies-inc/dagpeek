@@ -133,6 +133,14 @@ struct Watch {
     last: Option<ServerView>,
 }
 
+#[cfg(target_os = "macos")]
+#[derive(Clone, Copy, PartialEq)]
+struct TrayLook {
+    glyph: Glyph,
+    dot: Option<[u8; 3]>,
+    pulse: bool,
+}
+
 struct AppState {
     config: Mutex<Config>,
     view: Mutex<View>,
@@ -140,6 +148,8 @@ struct AppState {
     hidden_at: Mutex<Option<Instant>>,
     refresh: Notify,
     tray: Mutex<Option<TrayIcon>>,
+    #[cfg(target_os = "macos")]
+    look: Mutex<TrayLook>,
 }
 
 async fn history_for(client: &Client, watch: &mut Watch, name: &str) -> History {
@@ -394,9 +404,19 @@ fn update_tray(state: &AppState, view: &View) {
 
     #[cfg(target_os = "macos")]
     {
-        let drawn = tray_icon::draw_macos(glyph, failures > 0);
-        let _ = tray.set_icon(Some(Image::new_owned(drawn.rgba, drawn.width, drawn.size)));
-        let _ = tray.set_icon_as_template(true);
+        // Red for a recent failure, yellow for an older one or a server that can't be read,
+        // green while things run cleanly, nothing when there's nothing to say.
+        let recent = Utc::now() - chrono::Duration::hours(1);
+        let dot = if view.failed.iter().any(|f| f.run.finished_at.is_some_and(|t| t > recent)) {
+            Some(tray_icon::RED)
+        } else if !view.failed.is_empty() || !view.problems.is_empty() || view.connection != Connection::Ok {
+            Some(tray_icon::YELLOW)
+        } else if running > 0 {
+            Some(tray_icon::GREEN)
+        } else {
+            None
+        };
+        *state.look.lock().unwrap() = TrayLook { glyph, dot, pulse: running > 0 && dot.is_some() };
         let known = view.connection == Connection::Ok;
         let style = state.config.lock().unwrap().menu_bar_style;
         let single = (running == 1).then(|| view.running[0].progress.as_ref()).flatten();
@@ -407,6 +427,59 @@ fn update_tray(state: &AppState, view: &View) {
         let dark = true; // Windows' default taskbar; the ink stays legible on the light one too.
         let drawn = tray_icon::draw_windows(glyph, running, failures, dark);
         let _ = tray.set_icon(Some(Image::new_owned(drawn.rgba, drawn.width, drawn.size)));
+    }
+}
+
+/// Whether the menu bar item currently sits on a dark bar. That follows the wallpaper, not just
+/// dark mode, so only the status item itself can say.
+#[cfg(target_os = "macos")]
+fn menu_bar_is_dark(tray: &TrayIcon) -> bool {
+    use objc2::{msg_send, rc::Retained, runtime::AnyObject};
+    use objc2_foundation::NSString;
+    tray.with_inner_tray_icon(|inner| {
+        let Some(item) = inner.ns_status_item() else { return true };
+        // SAFETY: on the main thread (with_inner_tray_icon), on a live status item.
+        unsafe {
+            let button: Option<Retained<AnyObject>> = msg_send![&*item, button];
+            let Some(button) = button else { return true };
+            let appearance: Retained<AnyObject> = msg_send![&*button, effectiveAppearance];
+            let name: Retained<NSString> = msg_send![&*appearance, name];
+            name.to_string().contains("Dark")
+        }
+    })
+    .unwrap_or(true)
+}
+
+/// Draws the menu bar icon: a slow, shallow fade of the dot while jobs run, and otherwise a
+/// redraw only when something changes.
+#[cfg(target_os = "macos")]
+async fn tray_loop(app: AppHandle) {
+    const CYCLE_SECS: f64 = 2.6;
+    let state = app.state::<AppState>();
+    let started = Instant::now();
+    let mut last: Option<(TrayLook, bool)> = None;
+    let mut dark = true;
+    let mut checked: Option<Instant> = None;
+    loop {
+        let look = *state.look.lock().unwrap();
+        let tray = state.tray.lock().unwrap().clone();
+        if let Some(tray) = tray {
+            if checked.is_none_or(|t| t.elapsed() >= Duration::from_secs(3)) {
+                dark = menu_bar_is_dark(&tray);
+                checked = Some(Instant::now());
+            }
+            if look.pulse || last != Some((look, dark)) {
+                let wave = (started.elapsed().as_secs_f64() / CYCLE_SECS * std::f64::consts::TAU).sin();
+                let alpha = if look.pulse { 0.85 + 0.15 * wave } else { 1.0 };
+                let drawn = tray_icon::draw_macos(look.glyph, look.dot, alpha, dark);
+                let _ = tray.set_icon(Some(Image::new_owned(drawn.rgba, drawn.width, drawn.size)));
+                if last.is_none() {
+                    let _ = tray.set_icon_as_template(false);
+                }
+                last = Some((look, dark));
+            }
+        }
+        tokio::time::sleep(Duration::from_millis(if look.pulse { 325 } else { 1000 })).await;
     }
 }
 
@@ -810,6 +883,8 @@ fn main() {
             hidden_at: Mutex::new(None),
             refresh: Notify::new(),
             tray: Mutex::new(None),
+            #[cfg(target_os = "macos")]
+            look: Mutex::new(TrayLook { glyph: Glyph::Unknown, dot: None, pulse: false }),
         })
         .invoke_handler(tauri::generate_handler![
             get_view, get_config, save_prefs, save_server, delete_server, set_active_server,
@@ -830,10 +905,10 @@ fn main() {
 
             let quit_item = MenuItem::with_id(app, "quit", "Quit Dagpeek", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&quit_item])?;
-            let first = tray_icon::draw_macos(Glyph::Unknown, false);
+            let first = tray_icon::draw_macos(Glyph::Unknown, None, 1.0, true);
             let tray = TrayIconBuilder::with_id("main")
                 .icon(Image::new_owned(first.rgba, first.width, first.size))
-                .icon_as_template(cfg!(target_os = "macos"))
+                .icon_as_template(false)
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| {
@@ -854,6 +929,8 @@ fn main() {
                 })
                 .build(app)?;
             *app.state::<AppState>().tray.lock().unwrap() = Some(tray);
+            #[cfg(target_os = "macos")]
+            tauri::async_runtime::spawn(tray_loop(app.handle().clone()));
 
             tauri::async_runtime::spawn(poll_loop(app.handle().clone()));
             tauri::async_runtime::spawn(update_loop(app.handle().clone()));
