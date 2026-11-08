@@ -11,4 +11,4 @@ pub use client::{Auth, Client, Error};
 pub use models::*;
 pub use poller::{fetch_snapshot, Backoff, Connection, Snapshot};
 pub use progress::{History, Progress};
-pub use store::{AuthKind, Config, Server};
+pub use store::{AuthKind, Config, MenuBarStyle, Server};

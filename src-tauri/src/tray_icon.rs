@@ -1,6 +1,8 @@
 //! Draws the tray icon. macOS gets a template image with counts in the title beside it. Windows
 //! tray icons cannot show text, so the running count and failure state go into the image.
 
+use dagpeek_core::{MenuBarStyle, Progress};
+
 const FONT: [[u8; 5]; 10] = [
     [0b111, 0b101, 0b101, 0b101, 0b111],
     [0b010, 0b110, 0b010, 0b010, 0b111],
@@ -76,6 +78,18 @@ impl Canvas {
         }
     }
 
+    /// Cuts a soft-edged hole, so a badge stays separate from the ring in a template image.
+    fn cut(&mut self, cx: f64, cy: f64, radius: f64) {
+        for y in 0..self.size {
+            for x in 0..self.size {
+                let d = ((x as f64 + 0.5 - cx).powi(2) + (y as f64 + 0.5 - cy).powi(2)).sqrt();
+                let keep = (d - radius + 0.5).clamp(0.0, 1.0);
+                let i = ((y * self.size + x) * 4 + 3) as usize;
+                self.px[i] = (self.px[i] as f64 * keep) as u8;
+            }
+        }
+    }
+
     fn digit(&mut self, digit: usize, left: u32, top: u32, scale: u32) {
         for (row, bits) in FONT[digit].iter().enumerate() {
             for col in 0..3u32 {
@@ -110,11 +124,15 @@ fn draw_ring(c: &mut Canvas, glyph: Glyph) {
 }
 
 /// A template image for the macOS menu bar, at 2x of its 22 pt height.
-pub fn draw_macos(glyph: Glyph) -> Drawn {
+pub fn draw_macos(glyph: Glyph, failing: bool) -> Drawn {
     let mut c = Canvas::new(44, [0, 0, 0]);
     draw_ring(&mut c, glyph);
     if glyph == Glyph::Idle {
         c.dot(22.0, 22.0, 5.0, [0, 0, 0]);
+    }
+    if failing {
+        c.cut(35.0, 9.0, 10.5);
+        c.dot(35.0, 9.0, 7.0, [0, 0, 0]);
     }
     Drawn { rgba: c.px, size: 44 }
 }
@@ -134,19 +152,40 @@ pub fn draw_windows(glyph: Glyph, running: usize, failures: usize, dark_taskbar:
     Drawn { rgba: c.px, size: 32 }
 }
 
-/// The macOS title, in words: symbols and bare numbers had to be learned. Queued runs only
-/// show when nothing is running, so the title stays short.
-pub fn title(running: usize, queued: usize, failures: usize) -> Option<String> {
-    let mut parts = vec![];
-    if running > 0 {
-        parts.push(format!("{running} running"));
-    } else if queued > 0 {
-        parts.push(format!("{queued} queued"));
+fn short(secs: u64) -> String {
+    match secs {
+        0..=59 => format!("{secs}s"),
+        60..=3599 => format!("{}m", secs / 60),
+        _ => format!("{}h", secs / 3600),
     }
-    if failures > 0 {
-        parts.push(format!("{failures} failed"));
+}
+
+/// The macOS title for a chosen style. `single` is the progress of the only running run.
+pub fn title(style: MenuBarStyle, running: usize, queued: usize, failures: usize, single: Option<&Progress>) -> Option<String> {
+    match style {
+        MenuBarStyle::Icon => None,
+        MenuBarStyle::Failures => (failures > 0).then(|| failures.to_string()),
+        MenuBarStyle::Progress => match single {
+            Some(p) => Some(match p.eta_secs {
+                Some(eta) => format!("{}/{} \u{b7} {}", p.done, p.total, short(eta)),
+                None => format!("{}/{}", p.done, p.total),
+            }),
+            None if running > 1 => Some(format!("{running} running")),
+            None => None,
+        },
+        MenuBarStyle::Words => {
+            let mut parts = vec![];
+            if running > 0 {
+                parts.push(format!("{running} running"));
+            } else if queued > 0 {
+                parts.push(format!("{queued} queued"));
+            }
+            if failures > 0 {
+                parts.push(format!("{failures} failed"));
+            }
+            (!parts.is_empty()).then(|| parts.join(", "))
+        }
     }
-    (!parts.is_empty()).then(|| parts.join(", "))
 }
 
 #[cfg(test)]
@@ -159,22 +198,28 @@ mod tests {
 
     #[test]
     fn progress_ring_fills_with_the_fraction() {
-        let low = alpha_sum(&draw_macos(Glyph::Active { fraction: Some(0.1) }));
-        let high = alpha_sum(&draw_macos(Glyph::Active { fraction: Some(0.9) }));
+        let low = alpha_sum(&draw_macos(Glyph::Active { fraction: Some(0.1) }, false));
+        let high = alpha_sum(&draw_macos(Glyph::Active { fraction: Some(0.9) }, false));
         assert!(high > low);
     }
 
     #[test]
     fn unknown_differs_from_idle() {
-        assert_ne!(draw_macos(Glyph::Unknown).rgba, draw_macos(Glyph::Idle).rgba);
+        assert_ne!(draw_macos(Glyph::Unknown, false).rgba, draw_macos(Glyph::Idle, false).rgba);
+        assert_ne!(draw_macos(Glyph::Idle, true).rgba, draw_macos(Glyph::Idle, false).rgba);
         assert_ne!(draw_windows(Glyph::Unknown, 0, 0, true).rgba, draw_windows(Glyph::Idle, 0, 0, true).rgba);
     }
 
     #[test]
-    fn title_only_shows_nonzero_counts() {
-        assert_eq!(title(0, 0, 0), None);
-        assert_eq!(title(2, 3, 1).as_deref(), Some("2 running, 1 failed"));
-        assert_eq!(title(0, 3, 0).as_deref(), Some("3 queued"));
+    fn each_style_has_its_own_title() {
+        let p = Progress { done: 3, total: 6, current_step: None, fraction: Some(0.5), eta_secs: Some(330) };
+        assert_eq!(title(MenuBarStyle::Icon, 2, 3, 1, None), None);
+        assert_eq!(title(MenuBarStyle::Failures, 1, 0, 11, Some(&p)).as_deref(), Some("11"));
+        assert_eq!(title(MenuBarStyle::Failures, 1, 0, 0, Some(&p)), None);
+        assert_eq!(title(MenuBarStyle::Progress, 1, 0, 11, Some(&p)).as_deref(), Some("3/6 \u{b7} 5m"));
+        assert_eq!(title(MenuBarStyle::Progress, 2, 0, 0, None).as_deref(), Some("2 running"));
+        assert_eq!(title(MenuBarStyle::Words, 2, 3, 1, None).as_deref(), Some("2 running, 1 failed"));
+        assert_eq!(title(MenuBarStyle::Words, 0, 3, 0, None).as_deref(), Some("3 queued"));
     }
 
     #[test]

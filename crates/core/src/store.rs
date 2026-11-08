@@ -21,6 +21,21 @@ pub enum AuthKind {
     Bearer,
 }
 
+/// What the menu bar shows beside the icon.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MenuBarStyle {
+    /// Only the icon.
+    Icon,
+    /// The icon and the number of failing DAGs.
+    #[default]
+    Failures,
+    /// Steps and time left for a single run.
+    Progress,
+    /// "1 running, 6 failed".
+    Words,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Server {
@@ -46,6 +61,7 @@ pub struct Config {
     pub failures_seen_at: Option<DateTime<Utc>>,
     /// The same, for one DAG dismissed on its own.
     pub failures_seen_by_dag: BTreeMap<String, DateTime<Utc>>,
+    pub menu_bar_style: MenuBarStyle,
 }
 
 impl Default for Config {
@@ -59,6 +75,7 @@ impl Default for Config {
             notify_completion: false,
             failures_seen_at: None,
             failures_seen_by_dag: BTreeMap::new(),
+            menu_bar_style: MenuBarStyle::default(),
         }
     }
 }

@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 
 export type AuthKind = 'none' | 'basic' | 'bearer';
+export type MenuBarStyle = 'icon' | 'failures' | 'progress' | 'words';
 
 export interface Server {
   id: string;
@@ -17,6 +18,7 @@ export interface Config {
   hiddenTags: string[];
   notifyFailure: boolean;
   notifyCompletion: boolean;
+  menuBarStyle: MenuBarStyle;
 }
 
 export interface DagRun {
@@ -78,7 +80,7 @@ export interface View {
 export const api = {
   view: () => invoke<View>('get_view'),
   config: () => invoke<Config>('get_config'),
-  savePrefs: (prefs: Pick<Config, 'hiddenNames' | 'hiddenTags' | 'notifyFailure' | 'notifyCompletion'>) =>
+  savePrefs: (prefs: Pick<Config, 'hiddenNames' | 'hiddenTags' | 'notifyFailure' | 'notifyCompletion' | 'menuBarStyle'>) =>
     invoke<void>('save_prefs', { prefs }),
   saveServer: (server: Server, secret: string | null) => invoke<void>('save_server', { server, secret }),
   deleteServer: (id: string) => invoke<void>('delete_server', { id }),

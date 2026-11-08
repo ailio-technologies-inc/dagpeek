@@ -292,11 +292,13 @@ fn update_tray(state: &AppState, view: &View) {
 
     #[cfg(target_os = "macos")]
     {
-        let drawn = tray_icon::draw_macos(glyph);
+        let drawn = tray_icon::draw_macos(glyph, failures > 0);
         let _ = tray.set_icon(Some(Image::new_owned(drawn.rgba, drawn.size, drawn.size)));
         let _ = tray.set_icon_as_template(true);
         let known = view.connection == Connection::Ok;
-        let _ = tray.set_title(known.then(|| tray_icon::title(running, queued, failures)).flatten());
+        let style = state.config.lock().unwrap().menu_bar_style;
+        let single = (running == 1).then(|| view.running[0].progress.as_ref()).flatten();
+        let _ = tray.set_title(known.then(|| tray_icon::title(style, running, queued, failures, single)).flatten());
     }
     #[cfg(not(target_os = "macos"))]
     {
@@ -417,6 +419,7 @@ struct Prefs {
     hidden_tags: Vec<String>,
     notify_failure: bool,
     notify_completion: bool,
+    menu_bar_style: MenuBarStyle,
 }
 
 #[tauri::command]
@@ -426,6 +429,7 @@ fn save_prefs(state: State<AppState>, prefs: Prefs) -> Result<(), String> {
         c.hidden_tags = prefs.hidden_tags;
         c.notify_failure = prefs.notify_failure;
         c.notify_completion = prefs.notify_completion;
+        c.menu_bar_style = prefs.menu_bar_style;
     })
 }
 
@@ -580,7 +584,7 @@ fn main() {
 
             let quit_item = MenuItem::with_id(app, "quit", "Quit Dagpeek", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&quit_item])?;
-            let first = tray_icon::draw_macos(Glyph::Unknown);
+            let first = tray_icon::draw_macos(Glyph::Unknown, false);
             let tray = TrayIconBuilder::with_id("main")
                 .icon(Image::new_owned(first.rgba, first.size, first.size))
                 .icon_as_template(cfg!(target_os = "macos"))

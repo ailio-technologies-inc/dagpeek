@@ -1,9 +1,16 @@
 import { getVersion } from '@tauri-apps/api/app';
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { useEffect, useState } from 'react';
-import { api, type AuthKind, type Config, type Server } from './api';
+import { api, type AuthKind, type Config, type MenuBarStyle, type Server } from './api';
 
 const blank = (): Server => ({ id: crypto.randomUUID(), name: '', url: '', auth: 'none', username: '' });
+const STYLES: { id: MenuBarStyle; label: string; example: string }[] = [
+  { id: 'failures', label: 'Failures', example: '11' },
+  { id: 'icon', label: 'Icon only', example: '' },
+  { id: 'progress', label: 'Progress', example: '3/6 \u00b7 5m' },
+  { id: 'words', label: 'Words', example: '1 running, 11 failed' },
+];
+
 const list = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean);
 
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
@@ -143,6 +150,21 @@ export function Settings({ firstRun, onDone }: { firstRun: boolean; onDone: () =
             </div>
           ))}
           <button className="set-row add" onClick={() => setEditing(blank())}>Add a server</button>
+        </div>
+      </section>
+
+      <section>
+        <h3>Menu bar</h3>
+        <div className="set-group">
+          {STYLES.map((s) => (
+            <label key={s.id} className="set-row toggle">
+              <span className="radio-label">
+                <input type="radio" name="menu-bar" checked={config.menuBarStyle === s.id} onChange={() => savePrefs({ menuBarStyle: s.id })} />
+                {s.label}
+              </span>
+              <span className="meta">{s.example}</span>
+            </label>
+          ))}
         </div>
       </section>
 
