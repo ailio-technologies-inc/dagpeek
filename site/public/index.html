@@ -1,107 +1,103 @@
 <!doctype html>
-<html lang="en" data-state="running">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dagpeek: Dagu in your menu bar</title>
-<meta name="description" content="A free menu bar app for Mac. See what your Dagu server is running, what's queued, what failed, and how far each run has got.">
-<meta name="theme-color" content="#1a2a9e">
+<meta name="description" content="Dagpeek is a free Mac menu bar app that shows what your Dagu server is running, what's queued and what failed.">
 <link rel="canonical" href="https://dagpeek.com/">
 <link rel="icon" href="/icon.png">
 <meta property="og:title" content="Dagpeek: Dagu in your menu bar">
-<meta property="og:description" content="See what your Dagu server is doing without opening Dagu. Free, for Mac.">
+<meta property="og:description" content="See what your Dagu server is running, what's queued and what failed. Free, for Mac.">
 <meta property="og:url" content="https://dagpeek.com/">
 <meta property="og:image" content="https://dagpeek.com/icon.png">
-<link rel="preload" href="/fonts/funnel-display.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/site.css">
-<script src="/site.js" defer></script>
 </head>
 <body>
+<div class="page">
 
-<nav class="menubar" aria-label="Main">
-  <div class="menubar-inner">
-    <div class="menubar-left">
-      <a class="menu-brand" href="#top"><img src="/icon.png" alt="" width="18" height="18">Dagpeek</a>
-      <a href="#install">Install</a>
-      <a class="menu-wide" href="https://github.com/ailio-technologies-inc/dagpeek">GitHub</a>
-    </div>
-    <div class="tray" id="tray" aria-hidden="true"></div>
-  </div>
-</nav>
+<header class="top">
+  <img src="/wordmark-on-light.svg" alt="Dagpeek" width="150" height="34">
+  <a href="https://github.com/ailio-technologies-inc/dagpeek">GitHub</a>
+</header>
 
-<div class="stage" id="top">
-  <div class="story">
-
-    <header class="scene hero" data-scene="running">
-      <h1>See what Dagu is doing without opening Dagu</h1>
-      <p class="lede">A free menu bar app for Mac. What's running, what's queued, what failed, and how far each run has got.</p>
-      <div class="get">
-        <a class="button" href="https://github.com/ailio-technologies-inc/dagpeek/releases/latest/download/Dagpeek-mac.dmg">Download for Mac</a>
-      </div>
-      <p class="needs">Free and open source. macOS 13 or later, on Apple silicon and Intel. Windows is on the way.</p>
-      <div class="mount" data-mount="running"></div>
-    </header>
-
-    <section class="scene" id="progress" data-scene="steps">
-      <h2>How far along, in steps and in minutes</h2>
-      <p>Open any run to see each step, its status and how long it took. Time left is the typical length of the remaining steps over that DAG's last 10 successful runs.</p>
-      <p>With fewer than 3 runs to go on, Dagpeek shows no estimate at all.</p>
-      <div class="mount" data-mount="steps"></div>
-    </section>
-
-    <section class="scene" id="failures" data-scene="failed">
-      <h2>Failures wait until you've seen them</h2>
-      <p>A run that failed at 3am is still at the top of the list when you sit down. Click it to open the run in Dagu, then dismiss it when you're done.</p>
-      <div class="mount" data-mount="failed"></div>
-    </section>
-
-    <section class="scene" id="quiet" data-scene="quiet">
-      <h2>Hide the DAGs that never stop</h2>
-      <p>Hide health checks and other chatter by name or tag, and they stop notifying you too. Choose whether you hear about failures, finished runs, or both.</p>
-      <div class="mount" data-mount="quiet"></div>
-    </section>
-
-    <section class="scene" id="unknown" data-scene="unreachable">
-      <h2>It says when it doesn't know</h2>
-      <p>If your server can't be reached, the icon breaks and the popover tells you. Dagpeek never shows "0 running" when the truth is that it can't tell.</p>
-      <div class="mount" data-mount="unreachable"></div>
-    </section>
-
-    <section class="scene" id="private" data-scene="settings">
-      <h2>Nothing leaves your machine</h2>
-      <p>Dagpeek talks to the servers you add and to its update feed, and nothing else. There is no account, no analytics and no telemetry.</p>
-      <p>Passwords and tokens stay in your Mac's Keychain. It only reads from Dagu, so it can't start or stop anything.</p>
-      <div class="mount" data-mount="settings"></div>
-    </section>
-
-    <section class="scene" id="install" data-scene="running">
-      <h2>Install it</h2>
-      <p class="label">With Homebrew</p>
-      <pre><code>brew install --cask ailio-technologies-inc/tap/dagpeek</code></pre>
-      <p class="label">Or from the terminal, with the same servers as the app</p>
-      <pre class="terminal"><code>$ dagpeek status
-2 running, 1 queued, 1 failed in the last day
-  deploy-web: 4 of 6 steps, on run-migrations, about 70s left
-  load-warehouse: 1 of 5 steps, on extract</code></pre>
-      <div class="get">
-        <a class="button" href="https://github.com/ailio-technologies-inc/dagpeek/releases/latest/download/Dagpeek-mac.dmg">Download for Mac</a>
-      </div>
-    </section>
+<main>
+  <h1>Dagu in your menu bar.</h1>
+  <p class="lede">Dagpeek shows what your Dagu server is running, what's queued and what failed, without opening the web UI.</p>
+  <div class="get">
+    <a class="button" href="https://github.com/ailio-technologies-inc/dagpeek/releases/latest/download/Dagpeek-mac.dmg">Download for Mac</a>
+    <span>Free and open source. macOS 13 or later.</span>
   </div>
 
-  <aside class="desk" aria-hidden="true">
-    <div class="pop" id="pop">
-      <div class="pop-body">
-        <section><h3>Running</h3><div class="row"><span>deploy-web</span><span class="meta">2m 41s</span></div></section>
+  <div class="shot" role="img" aria-label="The Dagpeek popover open under the menu bar, showing one running job and failures grouped by DAG">
+    <div class="bar-top">
+      <b>Terminal</b>
+      <span class="tray">
+        <span class="status"><svg width="15" height="15" viewBox="0 0 22 22" fill="none" stroke="#fff" stroke-width="3.2" aria-hidden="true"><circle cx="11" cy="11" r="8" opacity=".35"/><circle cx="11" cy="11" r="8" pathLength="100" stroke-dasharray="58 100" transform="rotate(-90 11 11)"/></svg>1 running, 5 failed</span>
+        <span class="clock">Sun 2:19 PM</span>
+      </span>
+    </div>
+    <div class="desk">
+      <div class="pop">
+        <div class="pop-body">
+          <div>
+            <div class="head"><span>Running</span><span class="plain">1</span></div>
+            <div class="card">
+              <div class="line"><span class="name">deploy-web</span><span class="meta">6m 24s</span></div>
+              <div class="track"><i></i></div>
+              <div class="line small"><span>test</span><span>3 of 6, about 5m 30s left</span></div>
+            </div>
+          </div>
+          <div>
+            <div class="head"><span>Failed</span><span class="plain">Dismiss all</span></div>
+            <div class="fail"><i></i><span class="name">nightly-backup</span><b>6</b><span class="meta">14m ago</span></div>
+            <div class="fail"><i></i><span class="name">sync-invoices</span><b>3</b><span class="meta">27m ago</span></div>
+            <div class="fail"><i></i><span class="name">load-warehouse</span><span class="meta">47m ago</span></div>
+            <div class="fail"><i></i><span class="name">weekly-summary</span><span class="meta">1h ago</span></div>
+            <div class="fail"><i></i><span class="name">rotate-logs</span><b>2</b><span class="meta">3h ago</span></div>
+          </div>
+        </div>
+        <div class="pop-foot"><i></i>Production</div>
       </div>
     </div>
-  </aside>
-</div>
+  </div>
 
-<footer class="foot">
-  <p>Free and open source under the MIT license. <a href="https://github.com/ailio-technologies-inc/dagpeek">Source on GitHub</a>.</p>
-  <p>Made by <a href="https://ailio.ca">Ailio</a>. Dagpeek is an independent app for <a href="https://dagu.sh">Dagu</a> and isn't affiliated with the Dagu project.</p>
+  <div class="features">
+    <section>
+      <h2>How far each run has got</h2>
+      <p>Step counts, the current step, and time left based on that DAG's recent runs. If there isn't enough history for a fair estimate, it doesn't show one.</p>
+    </section>
+    <section>
+      <h2>Failures grouped by DAG</h2>
+      <p>A job that fails every 15 minutes is one line, with a count. It stays there until you dismiss it.</p>
+    </section>
+    <section>
+      <h2>Hide what you don't need</h2>
+      <p>Hide DAGs by name or tag. Hidden DAGs don't send notifications either.</p>
+    </section>
+    <section>
+      <h2>Clear when it's disconnected</h2>
+      <p>If it can't reach your server, the icon changes and Dagpeek tells you. It won't show zero runs.</p>
+    </section>
+    <section>
+      <h2>Private and read-only</h2>
+      <p>It only talks to your servers and its update feed. No account or analytics. Passwords and tokens stay in your Keychain, and it can't start or stop anything.</p>
+    </section>
+    <section>
+      <h2>A command too</h2>
+      <p><code>dagpeek status</code>, <code>runs</code> and <code>watch</code> use the same servers as the app.</p>
+    </section>
+  </div>
+
+  <h2 class="install" id="install">Install with Homebrew</h2>
+  <pre><code>brew install --cask ailio-technologies-inc/tap/dagpeek</code></pre>
+  <p class="later">A Windows version is on the way.</p>
+</main>
+
+<footer>
+  <p>MIT licensed. Made by <a href="https://ailio.ca">Ailio</a>. An independent app for <a href="https://dagu.sh">Dagu</a>, not affiliated with the Dagu project.</p>
 </footer>
 
+</div>
 </body>
 </html>

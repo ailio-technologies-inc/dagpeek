@@ -44,7 +44,8 @@ build_app() {
 }
 
 staple_dmg() {
-  DMG=$(ls "$BUNDLE"/dmg/*.dmg | head -1)
+  DMG="$BUNDLE/dmg/Dagpeek_${VERSION}_universal.dmg"
+  [ -f "$DMG" ] || fail "no dmg for $VERSION at $DMG"
   codesign --force --sign "Developer ID Application: Luigi Poole (N7TM93NL4Q)" --timestamp "$DMG"
   xcrun notarytool submit "$DMG" --keychain-profile dagpeek --wait | tee /dev/stderr | grep -q 'status: Accepted' \
     || fail "Apple did not accept the dmg"
