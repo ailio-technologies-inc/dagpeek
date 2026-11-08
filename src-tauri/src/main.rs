@@ -371,13 +371,10 @@ fn update_tray(state: &AppState, view: &View) {
     let glyph = match &view.connection {
         // A server that can't be read might be busy: unknown is never drawn as idle.
         Connection::Ok if running == 0 && !view.problems.is_empty() => Glyph::Unknown,
-        Connection::Ok if running == 1 => Glyph::Active { fraction: fractions.first().copied().flatten() },
-        Connection::Ok if running >= 2 => {
-            // Three rings is as many as stay readable at this size.
-            let count = running.min(3);
-            let mut runs = [None; 4];
-            runs[..count].copy_from_slice(&fractions[..count]);
-            Glyph::Segments { runs, count }
+        Connection::Ok if running > 0 => {
+            // One ring: the combined progress of everything running.
+            let known: Vec<f64> = fractions.iter().copied().flatten().collect();
+            Glyph::Active { fraction: (!known.is_empty()).then(|| known.iter().sum::<f64>() / known.len() as f64) }
         }
         Connection::Ok => Glyph::Idle,
         _ => Glyph::Unknown,
