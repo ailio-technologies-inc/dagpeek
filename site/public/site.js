@@ -1,23 +1,12 @@
-// Google Analytics for this website, only after a visitor says yes.
+// Google Analytics for this website, by the visitor's consent (src/index.js holds the rules:
+// opt-out, except Quebec, which waits for Allow).
 (function () {
   'use strict';
 
   var ID = 'G-GQ102DTLE4';
-  var KEY = 'dagpeek_consent';
   var banner = document.getElementById('consent');
-  var started = false;
-
-  function read() {
-    try { return localStorage.getItem(KEY); } catch (e) { return null; }
-  }
-
-  function write(value) {
-    try { localStorage.setItem(KEY, value); } catch (e) {}
-  }
 
   function start() {
-    if (started) return;
-    started = true;
     window.dataLayer = window.dataLayer || [];
     window.gtag = function () { window.dataLayer.push(arguments); };
     window.gtag('consent', 'default', { ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied', analytics_storage: 'granted' });
@@ -42,15 +31,16 @@
   banner.addEventListener('click', function (event) {
     var choice = event.target.getAttribute && event.target.getAttribute('data-choice');
     if (!choice) return;
-    write(choice);
     banner.hidden = true;
-    if (choice === 'granted') {
-      start();
-    } else {
-      var wasOn = started;
-      forget();
-      if (wasOn) location.reload();
-    }
+    fetch('/data/consent', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ choice: choice }),
+    }).then(function () {
+      if (choice === 'denied') forget();
+      location.reload();
+    });
   });
 
   document.getElementById('cookie-choices').addEventListener('click', function () {
@@ -62,7 +52,11 @@
     if (link && window.gtag) window.gtag('event', 'download_click');
   });
 
-  var answer = read();
-  if (answer === 'granted') start();
-  else if (answer === null) banner.hidden = false;
+  fetch('/data/consent', { credentials: 'same-origin' })
+    .then(function (response) { return response.json(); })
+    .then(function (state) {
+      if (state.analytics) start();
+      if (state.banner) banner.hidden = false;
+    })
+    .catch(function () {});
 })();
