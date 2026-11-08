@@ -28,6 +28,7 @@ const HISTORY_TTL: Duration = Duration::from_secs(30 * 60);
 const POPOVER_GAP: f64 = 8.0;
 const ALL_SERVERS: &str = "*";
 const UPDATE_INTERVAL: Duration = Duration::from_secs(6 * 60 * 60);
+const UPDATE_RETRY: Duration = Duration::from_secs(10 * 60);
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -763,10 +764,16 @@ async fn usage_loop(app: AppHandle) {
 async fn update_loop(app: AppHandle) {
     tokio::time::sleep(Duration::from_secs(5)).await;
     loop {
-        if let Ok(Some(version)) = install_update(&app).await {
-            restart_when_idle(app.clone(), version).await;
-        }
-        tokio::time::sleep(UPDATE_INTERVAL).await;
+        // A failed check (network not up yet, say) tries again soon, not in six hours.
+        let wait = match install_update(&app).await {
+            Ok(Some(version)) => {
+                restart_when_idle(app.clone(), version).await;
+                UPDATE_INTERVAL
+            }
+            Ok(None) => UPDATE_INTERVAL,
+            Err(_) => UPDATE_RETRY,
+        };
+        tokio::time::sleep(wait).await;
     }
 }
 
