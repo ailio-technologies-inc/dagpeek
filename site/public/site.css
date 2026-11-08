@@ -61,6 +61,11 @@ footer p + p { margin-top: 4px; }
 .choices button { min-height: 44px; padding: 0 16px; border: 0; border-radius: 8px; background: #f0f0f3; color: #1d1d1f; font: inherit; font-weight: 600; cursor: pointer; }
 .choices .yes { background: #1d1d1f; color: #fff; }
 
+.legal main { max-width: 38em; }
+.legal main h2 { margin: 28px 0 4px; font-size: 18px; font-weight: 650; }
+.legal main p { color: #424245; }
+.legal .lede { font-size: 19px; }
+
 @media (max-width: 520px) {
   .desk { padding: 8px 10px 20px; }
   .clock { display: none; }
