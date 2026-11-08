@@ -41,11 +41,12 @@ const Chevron = ({ open }: { open: boolean }) => (
   <svg className={open ? 'chev open' : 'chev'} viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 2.5 8 6l-3.5 3.5" /></svg>
 );
 
-function Icon({ d }: { d: string }) {
-  return <svg className="icon" viewBox="0 0 16 16" aria-hidden="true"><path d={d} /></svg>;
+function Icon({ d, box = 16 }: { d: string; box?: number }) {
+  return <svg className="icon" viewBox={`0 0 ${box} ${box}`} aria-hidden="true"><path d={d} /></svg>;
 }
 const OPEN = 'M6.5 3H3.5A1 1 0 0 0 2.5 4v8.5a1 1 0 0 0 1 1H12a1 1 0 0 0 1-1v-3M9.5 2.5h4v4M13.5 2.5 7.5 8.5';
-const GEAR = 'M8 10.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4ZM8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2';
+// Lucide's settings icon (ISC licence), on a 24 unit grid.
+const GEAR = 'M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2zM15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z';
 const POWER = 'M8 2v5.5M11.6 4.2a5.2 5.2 0 1 1-7.2 0';
 const CLOSE = 'M4 4l8 8M12 4l-8 8';
 
@@ -259,7 +260,7 @@ export function App() {
               {view.serverUrl && (
                 <button className="icon-btn" title="Open Dagu" aria-label="Open Dagu" onClick={() => void api.open(view.serverUrl!)}><Icon d={OPEN} /></button>
               )}
-              <button className="icon-btn" title="Settings" aria-label="Settings" onClick={() => setSettings(true)}><Icon d={GEAR} /></button>
+              <button className="icon-btn" title="Settings" aria-label="Settings" onClick={() => setSettings(true)}><Icon d={GEAR} box={24} /></button>
               <button className="icon-btn" title="Quit Dagpeek" aria-label="Quit Dagpeek" onClick={() => void api.quit()}><Icon d={POWER} /></button>
             </span>
           </footer>

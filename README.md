@@ -4,6 +4,8 @@ See what your [Dagu](https://dagu.sh) server is doing without opening Dagu. A fr
 
 It shows what's running, what's queued, what failed since you last looked, and how far each run has got.
 
+![The Dagpeek popover](docs/screenshot.png)
+
 ## Install
 
 ```sh

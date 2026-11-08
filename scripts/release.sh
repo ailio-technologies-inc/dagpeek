@@ -21,6 +21,16 @@ check_clean() {
   grep -q "^version = \"$VERSION\"" Cargo.toml || fail "Cargo.toml is not at $VERSION"
 }
 
+# The README's image comes from the real UI, so it changes when the UI does.
+update_screenshot() {
+  scripts/screenshot.sh || fail "could not render the README screenshot"
+  git add docs/screenshot.png
+  if ! git diff --cached --quiet -- docs/screenshot.png; then
+    git commit -q -m "The README screenshot matches the UI." -- docs/screenshot.png
+    git push -q origin HEAD
+  fi
+}
+
 run_tests() {
   cargo test --workspace || fail "tests failed"
 }
@@ -53,8 +63,10 @@ staple_dmg() {
   DMG="$BUNDLE/dmg/Dagpeek_${VERSION}_universal.dmg"
   [ -f "$DMG" ] || fail "no dmg for $VERSION at $DMG"
   codesign --force --sign "Developer ID Application: Luigi Poole (N7TM93NL4Q)" --timestamp "$DMG"
-  xcrun notarytool submit "$DMG" --keychain-profile dagpeek --wait | tee /dev/stderr | grep -q 'status: Accepted' \
-    || fail "Apple did not accept the dmg"
+  local result
+  result=$(xcrun notarytool submit "$DMG" --keychain-profile dagpeek --wait) || fail "could not submit the dmg to Apple"
+  echo "$result"
+  grep -q 'status: Accepted' <<<"$result" || fail "Apple did not accept the dmg"
   xcrun stapler staple "$DMG" || fail "could not staple the dmg"
 }
 
@@ -97,6 +109,7 @@ update_cask() {
   rm -rf "$dir"
 }
 
+update_screenshot
 check_clean
 run_tests
 build_cli
