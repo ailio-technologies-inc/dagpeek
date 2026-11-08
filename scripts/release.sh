@@ -35,7 +35,10 @@ build_cli() {
 
 build_app() {
   export APPLE_SIGNING_IDENTITY="Developer ID Application: Luigi Poole (N7TM93NL4Q)"
-  export APPLE_API_ISSUER=85a4b222-6268-4476-b98b-0f29410d87fc APPLE_API_KEY=XZ63X96724
+  # APPLE_API_ISSUER and APPLE_API_KEY, kept out of the repo.
+  # shellcheck disable=SC1091
+  source "$HOME/.appstoreconnect/dagpeek.env" || fail "no ~/.appstoreconnect/dagpeek.env"
+  export APPLE_API_ISSUER APPLE_API_KEY
   export APPLE_API_KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_$APPLE_API_KEY.p8"
   export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
   TAURI_SIGNING_PRIVATE_KEY="$(cat "$HOME/.tauri/dagpeek.key")"
