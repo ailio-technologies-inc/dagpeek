@@ -554,6 +554,7 @@ struct Prefs {
     notify_completion: bool,
     menu_bar_style: MenuBarStyle,
     allow_actions: bool,
+    usage_stats: bool,
 }
 
 #[tauri::command]
@@ -565,6 +566,7 @@ fn save_prefs(state: State<AppState>, prefs: Prefs) -> Result<(), String> {
         c.notify_completion = prefs.notify_completion;
         c.menu_bar_style = prefs.menu_bar_style;
         c.allow_actions = prefs.allow_actions;
+        c.usage_stats = prefs.usage_stats;
     })
 }
 
@@ -695,6 +697,34 @@ async fn restart_when_idle(app: AppHandle, version: String) {
     app.restart();
 }
 
+/// At most one anonymous "active today" count a day, and none if it's turned off in Settings.
+async fn usage_loop(app: AppHandle) {
+    let Some(secret) = option_env!("DAGPEEK_GA_API_SECRET") else { return };
+    loop {
+        let state = app.state::<AppState>();
+        let today = Utc::now().format("%Y-%m-%d").to_string();
+        let due = {
+            let mut config = state.config.lock().unwrap();
+            if config.usage_stats && config.usage_sent_on.as_deref() != Some(today.as_str()) {
+                let id = config.install_id.get_or_insert_with(|| uuid::Uuid::new_v4().to_string()).clone();
+                Some(id)
+            } else {
+                None
+            }
+        };
+        if let Some(id) = due {
+            let version = app.package_info().version.to_string();
+            let os = std::env::consts::OS;
+            if dagpeek_core::usage::send_active(secret, &id, &version, os, &today).await.is_ok() {
+                let mut config = state.config.lock().unwrap();
+                config.usage_sent_on = Some(today);
+                let _ = config.save();
+            }
+        }
+        tokio::time::sleep(Duration::from_secs(60 * 60)).await;
+    }
+}
+
 async fn update_loop(app: AppHandle) {
     tokio::time::sleep(Duration::from_secs(5)).await;
     loop {
@@ -774,6 +804,7 @@ fn main() {
 
             tauri::async_runtime::spawn(poll_loop(app.handle().clone()));
             tauri::async_runtime::spawn(update_loop(app.handle().clone()));
+            tauri::async_runtime::spawn(usage_loop(app.handle().clone()));
             Ok(())
         })
         .run(tauri::generate_context!())

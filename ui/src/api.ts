@@ -21,6 +21,7 @@ export interface Config {
   notifyCompletion: boolean;
   menuBarStyle: MenuBarStyle;
   allowActions: boolean;
+  usageStats: boolean;
 }
 
 export interface DagRun {
@@ -88,7 +89,7 @@ export interface View {
 export const api = {
   view: () => invoke<View>('get_view'),
   config: () => invoke<Config>('get_config'),
-  savePrefs: (prefs: Pick<Config, 'hiddenNames' | 'hiddenTags' | 'notifyFailure' | 'notifyCompletion' | 'menuBarStyle' | 'allowActions'>) =>
+  savePrefs: (prefs: Pick<Config, 'hiddenNames' | 'hiddenTags' | 'notifyFailure' | 'notifyCompletion' | 'menuBarStyle' | 'allowActions' | 'usageStats'>) =>
     invoke<void>('save_prefs', { prefs }),
   saveServer: (server: Server, secret: string | null) => invoke<void>('save_server', { server, secret }),
   deleteServer: (id: string) => invoke<void>('delete_server', { id }),

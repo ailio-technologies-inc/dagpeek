@@ -1,4 +1,4 @@
-// Google Analytics for this website only, and only after a visitor says yes. The app has none.
+// Google Analytics for this website, only after a visitor says yes.
 (function () {
   'use strict';
 

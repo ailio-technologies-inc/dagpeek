@@ -6,6 +6,7 @@ pub mod poller;
 pub mod progress;
 pub mod store;
 pub mod time;
+pub mod usage;
 
 pub use client::{Auth, Client, Error};
 pub use models::*;

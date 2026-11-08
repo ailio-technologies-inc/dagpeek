@@ -178,6 +178,7 @@ export function Settings({ firstRun, onDone }: { firstRun: boolean; onDone: () =
           <Toggle label="Notify me when a run fails" checked={config.notifyFailure} onChange={(v) => savePrefs({ notifyFailure: v })} />
           <Toggle label="Notify me when a run finishes" checked={config.notifyCompletion} onChange={(v) => savePrefs({ notifyCompletion: v })} />
           <Toggle label="Allow stop, retry and remove from queue" checked={config.allowActions} onChange={(v) => savePrefs({ allowActions: v })} />
+          <Toggle label="Share anonymous usage count" checked={config.usageStats} onChange={(v) => savePrefs({ usageStats: v })} />
         </div>
       </section>
 

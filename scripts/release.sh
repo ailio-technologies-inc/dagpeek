@@ -57,6 +57,8 @@ build_app() {
   # shellcheck disable=SC1091
   source "$HOME/.appstoreconnect/dagpeek.env" || fail "no ~/.appstoreconnect/dagpeek.env"
   export APPLE_API_ISSUER APPLE_API_KEY
+  # Compiled in for the daily usage count. A build without it sends nothing.
+  if [ -n "${DAGPEEK_GA_API_SECRET:-}" ]; then export DAGPEEK_GA_API_SECRET; fi
   export APPLE_API_KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_$APPLE_API_KEY.p8"
   export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
   TAURI_SIGNING_PRIVATE_KEY="$(cat "$HOME/.tauri/dagpeek.key")"

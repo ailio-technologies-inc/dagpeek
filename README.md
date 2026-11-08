@@ -28,7 +28,7 @@ dagpeek watch <dag>
 
 ## Privacy and control
 
-Dagpeek talks to the servers you add and to its update feed. It has no account, analytics or telemetry.
+Dagpeek talks to the servers you add, its update feed, and Google Analytics for one anonymous count a day: a random install id, the app version and the OS. It never includes your servers, DAGs or runs. Turn it off in Settings. There's no account.
 
 It only reads from Dagu until you turn on actions in Settings. Then you can stop, retry or dequeue runs, and each one asks you to confirm.
 

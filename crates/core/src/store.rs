@@ -66,6 +66,12 @@ pub struct Config {
     pub show_all_servers: bool,
     /// Whether stop, retry and remove from queue are offered. Off until someone turns it on.
     pub allow_actions: bool,
+    /// Send the anonymous daily active count. On until someone turns it off.
+    pub usage_stats: bool,
+    /// A random id for this install, made the first time a count is sent.
+    pub install_id: Option<String>,
+    /// The UTC day the last count went out, so there is at most one a day.
+    pub usage_sent_on: Option<String>,
 }
 
 impl Default for Config {
@@ -82,6 +88,9 @@ impl Default for Config {
             menu_bar_style: MenuBarStyle::default(),
             show_all_servers: false,
             allow_actions: false,
+            usage_stats: true,
+            install_id: None,
+            usage_sent_on: None,
         }
     }
 }
