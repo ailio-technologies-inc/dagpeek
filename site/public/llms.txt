@@ -1,0 +1,8 @@
+# Dagpeek
+
+> A free Mac menu bar app, by Ailio, that shows what a Dagu server is running, what's queued and what failed. Read-only. No account or analytics.
+
+- [Home](https://dagpeek.com/): what it does and how to install it
+- [Source](https://github.com/ailio-technologies-inc/dagpeek): MIT licensed
+
+Install: brew install --cask ailio-technologies-inc/tap/dagpeek
