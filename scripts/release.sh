@@ -29,6 +29,9 @@ build_cli() {
   cargo build --release -p dagpeek --target aarch64-apple-darwin || fail "CLI build failed (arm64)"
   cargo build --release -p dagpeek --target x86_64-apple-darwin || fail "CLI build failed (x86_64)"
   mkdir -p target/sidecar
+  # Tauri builds each architecture, then the universal app, and wants the command for all three.
+  cp target/aarch64-apple-darwin/release/dagpeek target/sidecar/dagpeek-aarch64-apple-darwin
+  cp target/x86_64-apple-darwin/release/dagpeek target/sidecar/dagpeek-x86_64-apple-darwin
   lipo -create -output "target/sidecar/dagpeek-$TARGET" \
     target/aarch64-apple-darwin/release/dagpeek target/x86_64-apple-darwin/release/dagpeek
 }

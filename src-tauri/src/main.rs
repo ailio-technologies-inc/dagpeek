@@ -370,6 +370,37 @@ fn place_popover(window: &WebviewWindow, rect: Rect) {
     let _ = window.set_position(PhysicalPosition::new(x, y));
 }
 
+#[cfg(target_os = "macos")]
+#[link(name = "CoreGraphics", kind = "framework")]
+extern "C" {
+    fn CGEventSourceButtonState(state: i32, button: u32) -> bool;
+}
+
+/// Closes the popover on a click anywhere else. A menu bar app often never becomes the active
+/// app, so losing focus alone can't be relied on to report that.
+#[cfg(target_os = "macos")]
+async fn close_on_outside_click(app: AppHandle) {
+    const COMBINED_SESSION: i32 = 0;
+    let Some(window) = app.get_webview_window("popover") else { return };
+    while *app.state::<AppState>().popover_open.lock().unwrap() {
+        // SAFETY: a read-only query taking plain integers.
+        let pressed = unsafe { CGEventSourceButtonState(COMBINED_SESSION, 0) || CGEventSourceButtonState(COMBINED_SESSION, 1) };
+        if pressed {
+            let inside = match (app.cursor_position(), window.outer_position(), window.outer_size()) {
+                (Ok(c), Ok(p), Ok(s)) => {
+                    c.x >= p.x as f64 && c.x < p.x as f64 + s.width as f64 && c.y >= p.y as f64 && c.y < p.y as f64 + s.height as f64
+                }
+                _ => true,
+            };
+            if !inside {
+                hide_popover(&app);
+                return;
+            }
+        }
+        tokio::time::sleep(Duration::from_millis(30)).await;
+    }
+}
+
 fn hide_popover(app: &AppHandle) {
     let Some(window) = app.get_webview_window("popover") else { return };
     let _ = window.hide();
@@ -382,7 +413,7 @@ fn toggle_popover(app: &AppHandle, rect: Rect) {
     let Some(window) = app.get_webview_window("popover") else { return };
     let state = app.state::<AppState>();
     // Clicking the icon while open blurs the popover first; that click must not reopen it.
-    let just_hidden = state.hidden_at.lock().unwrap().is_some_and(|t| t.elapsed() < Duration::from_millis(250));
+    let just_hidden = state.hidden_at.lock().unwrap().is_some_and(|t| t.elapsed() < Duration::from_millis(500));
     if window.is_visible().unwrap_or(false) || just_hidden {
         hide_popover(app);
         return;
@@ -392,6 +423,8 @@ fn toggle_popover(app: &AppHandle, rect: Rect) {
     let _ = window.set_focus();
     *state.popover_open.lock().unwrap() = true;
     state.refresh.notify_one();
+    #[cfg(target_os = "macos")]
+    tauri::async_runtime::spawn(close_on_outside_click(app.clone()));
 }
 
 #[tauri::command]
