@@ -47,6 +47,11 @@ build_cli() {
 }
 
 build_app() {
+  # A disk image left mounted from an earlier build makes the dmg step fail, or write through its
+  # Applications shortcut into the real /Applications.
+  for volume in /Volumes/Dagpeek* /Volumes/dmg.*; do
+    [ -d "$volume" ] && hdiutil detach -force "$volume" || true
+  done
   export APPLE_SIGNING_IDENTITY="Developer ID Application: Luigi Poole (N7TM93NL4Q)"
   # APPLE_API_ISSUER and APPLE_API_KEY, kept out of the repo.
   # shellcheck disable=SC1091
