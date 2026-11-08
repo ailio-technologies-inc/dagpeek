@@ -115,6 +115,13 @@ export function formatDuration(totalSecs: number): string {
   return `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
+export function formatShort(totalSecs: number): string {
+  const s = Math.max(0, Math.round(totalSecs));
+  if (s < 60) return `${s}s`;
+  const m = Math.round(s / 60);
+  return m < 60 ? `${m}m` : `${Math.round(m / 60)}h`;
+}
+
 /** "Just now", "13m ago", "2h ago", "3d ago": seconds would only make the list flicker. */
 export function formatAgo(secs: number): string {
   if (secs < 60) return 'Just now';

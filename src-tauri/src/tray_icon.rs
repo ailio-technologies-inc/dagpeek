@@ -22,7 +22,7 @@ pub enum Glyph {
     Idle,
     /// Runs in progress, shown as one ring. `fraction` is where it has got, when known.
     Active { fraction: Option<f64> },
-    /// Two to four runs, one arc each. The first `count` entries are used.
+    /// Two or three runs, one concentric ring each. The first `count` entries are used.
     Segments { runs: [Option<f64>; 4], count: usize },
     /// Not known: unreachable or refused. Never drawn as idle.
     Unknown,
@@ -30,10 +30,12 @@ pub enum Glyph {
 
 pub struct Drawn {
     pub rgba: Vec<u8>,
+    pub width: u32,
     pub size: u32,
 }
 
 struct Canvas {
+    w: u32,
     size: u32,
     px: Vec<u8>,
     ink: [u8; 3],
@@ -41,14 +43,18 @@ struct Canvas {
 
 impl Canvas {
     fn new(size: u32, ink: [u8; 3]) -> Self {
-        Self { size, px: vec![0; (size * size * 4) as usize], ink }
+        Self::wide(size, size, ink)
+    }
+
+    fn wide(w: u32, size: u32, ink: [u8; 3]) -> Self {
+        Self { w, size, px: vec![0; (w * size * 4) as usize], ink }
     }
 
     fn put(&mut self, x: u32, y: u32, color: [u8; 3], alpha: f64) {
-        if x >= self.size || y >= self.size || alpha <= 0.0 {
+        if x >= self.w || y >= self.size || alpha <= 0.0 {
             return;
         }
-        let i = ((y * self.size + x) * 4) as usize;
+        let i = ((y * self.w + x) * 4) as usize;
         let a = (alpha.min(1.0) * 255.0) as u8;
         if a >= self.px[i + 3] {
             self.px[i..i + 3].copy_from_slice(&color);
@@ -60,7 +66,7 @@ impl Canvas {
     fn ring(&mut self, radius: f64, width: f64, alpha: f64, keep: impl Fn(f64) -> bool) {
         let c = self.size as f64 / 2.0;
         for y in 0..self.size {
-            for x in 0..self.size {
+            for x in 0..self.w {
                 let (dx, dy) = (x as f64 + 0.5 - c, y as f64 + 0.5 - c);
                 let edge = width / 2.0 - ((dx * dx + dy * dy).sqrt() - radius).abs();
                 let angle = (dx.atan2(-dy) / std::f64::consts::TAU).rem_euclid(1.0);
@@ -73,7 +79,7 @@ impl Canvas {
 
     fn dot(&mut self, cx: f64, cy: f64, radius: f64, color: [u8; 3]) {
         for y in 0..self.size {
-            for x in 0..self.size {
+            for x in 0..self.w {
                 let d = ((x as f64 + 0.5 - cx).powi(2) + (y as f64 + 0.5 - cy).powi(2)).sqrt();
                 self.put(x, y, color, (radius - d + 0.5).clamp(0.0, 1.0));
             }
@@ -83,10 +89,10 @@ impl Canvas {
     /// Cuts a soft-edged hole, so a badge stays separate from the ring in a template image.
     fn cut(&mut self, cx: f64, cy: f64, radius: f64) {
         for y in 0..self.size {
-            for x in 0..self.size {
+            for x in 0..self.w {
                 let d = ((x as f64 + 0.5 - cx).powi(2) + (y as f64 + 0.5 - cy).powi(2)).sqrt();
                 let keep = (d - radius + 0.5).clamp(0.0, 1.0);
-                let i = ((y * self.size + x) * 4 + 3) as usize;
+                let i = ((y * self.w + x) * 4 + 3) as usize;
                 self.px[i] = (self.px[i] as f64 * keep) as u8;
             }
         }
@@ -121,14 +127,14 @@ fn draw_ring(c: &mut Canvas, glyph: Glyph) {
             c.ring(radius, width, 1.0, |a| a <= 0.3);
         }
         Glyph::Segments { runs, count } => {
-            let gap = 0.045;
-            for (i, run) in runs.iter().take(count).enumerate() {
-                let start = i as f64 / count as f64 + gap / 2.0;
-                let span = 1.0 / count as f64 - gap;
-                c.ring(radius, width, 0.3, move |a| a >= start && a <= start + span);
+            // Nested like activity rings, the newest run outermost.
+            let (rings, band): (&[f64], f64) = if count >= 3 { (&[0.44, 0.285, 0.13], 0.115) } else { (&[0.42, 0.225], 0.15) };
+            for (run, r) in runs.iter().zip(rings).take(count) {
+                let (r, band) = (size * r, size * band);
+                c.ring(r, band, 0.28, |_| true);
                 if let Some(f) = run {
-                    let end = start + span * f.clamp(0.0, 1.0);
-                    c.ring(radius, width, 1.0, move |a| a >= start && a <= end);
+                    let f = f.clamp(0.0, 1.0);
+                    c.ring(r, band, 1.0, move |a| a <= f);
                 }
             }
         }
@@ -139,16 +145,22 @@ fn draw_ring(c: &mut Canvas, glyph: Glyph) {
 
 /// A template image for the macOS menu bar, at 2x of its 22 pt height.
 pub fn draw_macos(glyph: Glyph, failing: bool) -> Drawn {
-    let mut c = Canvas::new(44, [0, 0, 0]);
+    // While runs are drawn the failure dot sits beside the rings, next to its count, so the two
+    // can't be confused. With nothing running it's the logo: a ring with a notched dot.
+    let beside = failing && matches!(glyph, Glyph::Active { .. } | Glyph::Segments { .. });
+    let width = if beside { 60 } else { 44 };
+    let mut c = Canvas::wide(width, 44, [0, 0, 0]);
     draw_ring(&mut c, glyph);
     if glyph == Glyph::Idle {
         c.dot(22.0, 22.0, 5.0, [0, 0, 0]);
     }
-    if failing {
+    if beside {
+        c.dot(52.0, 22.0, 7.0, [0, 0, 0]);
+    } else if failing {
         c.cut(35.0, 9.0, 10.5);
         c.dot(35.0, 9.0, 7.0, [0, 0, 0]);
     }
-    Drawn { rgba: c.px, size: 44 }
+    Drawn { rgba: c.px, width, size: 44 }
 }
 
 /// A colour icon for the Windows notification area: `running` in the middle, a red dot for failures.
@@ -163,7 +175,7 @@ pub fn draw_windows(glyph: Glyph, running: usize, failures: usize, dark_taskbar:
     if failures > 0 {
         c.dot(25.0, 7.0, 6.5, [222, 56, 56]);
     }
-    Drawn { rgba: c.px, size: 32 }
+    Drawn { rgba: c.px, width: 32, size: 32 }
 }
 
 fn short(secs: u64) -> String {
@@ -248,6 +260,6 @@ mod tests {
     #[test]
     fn buffers_match_their_size() {
         let d = draw_windows(Glyph::Idle, 3, 1, false);
-        assert_eq!(d.rgba.len() as u32, d.size * d.size * 4);
+        assert_eq!(d.rgba.len() as u32, d.width * d.size * 4);
     }
 }

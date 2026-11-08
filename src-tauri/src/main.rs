@@ -371,15 +371,12 @@ fn update_tray(state: &AppState, view: &View) {
         // A server that can't be read might be busy: unknown is never drawn as idle.
         Connection::Ok if running == 0 && !view.problems.is_empty() => Glyph::Unknown,
         Connection::Ok if running == 1 => Glyph::Active { fraction: fractions.first().copied().flatten() },
-        Connection::Ok if (2..=4).contains(&running) => {
+        Connection::Ok if running >= 2 => {
+            // Three rings is as many as stay readable at this size.
+            let count = running.min(3);
             let mut runs = [None; 4];
-            runs[..running].copy_from_slice(&fractions[..running]);
-            Glyph::Segments { runs, count: running }
-        }
-        Connection::Ok if running > 4 => {
-            // Too many arcs to read: one ring, the average of what's known.
-            let known: Vec<f64> = fractions.iter().copied().flatten().collect();
-            Glyph::Active { fraction: (!known.is_empty()).then(|| known.iter().sum::<f64>() / known.len() as f64) }
+            runs[..count].copy_from_slice(&fractions[..count]);
+            Glyph::Segments { runs, count }
         }
         Connection::Ok => Glyph::Idle,
         _ => Glyph::Unknown,
@@ -400,7 +397,7 @@ fn update_tray(state: &AppState, view: &View) {
     #[cfg(target_os = "macos")]
     {
         let drawn = tray_icon::draw_macos(glyph, failures > 0);
-        let _ = tray.set_icon(Some(Image::new_owned(drawn.rgba, drawn.size, drawn.size)));
+        let _ = tray.set_icon(Some(Image::new_owned(drawn.rgba, drawn.width, drawn.size)));
         let _ = tray.set_icon_as_template(true);
         let known = view.connection == Connection::Ok;
         let style = state.config.lock().unwrap().menu_bar_style;
@@ -411,7 +408,7 @@ fn update_tray(state: &AppState, view: &View) {
     {
         let dark = true; // Windows' default taskbar; the ink stays legible on the light one too.
         let drawn = tray_icon::draw_windows(glyph, running, failures, dark);
-        let _ = tray.set_icon(Some(Image::new_owned(drawn.rgba, drawn.size, drawn.size)));
+        let _ = tray.set_icon(Some(Image::new_owned(drawn.rgba, drawn.width, drawn.size)));
     }
 }
 
@@ -527,6 +524,7 @@ fn show_popover(app: &AppHandle, window: &WebviewWindow, rect: Rect) {
     let state = app.state::<AppState>();
     *state.popover_open.lock().unwrap() = true;
     state.refresh.notify_one();
+    let _ = app.emit("popover-opened", ());
     #[cfg(target_os = "macos")]
     tauri::async_runtime::spawn(close_on_outside_click(app.clone()));
 }
@@ -830,7 +828,7 @@ fn main() {
             let menu = Menu::with_items(app, &[&quit_item])?;
             let first = tray_icon::draw_macos(Glyph::Unknown, false);
             let tray = TrayIconBuilder::with_id("main")
-                .icon(Image::new_owned(first.rgba, first.size, first.size))
+                .icon(Image::new_owned(first.rgba, first.width, first.size))
                 .icon_as_template(cfg!(target_os = "macos"))
                 .menu(&menu)
                 .show_menu_on_left_click(false)

@@ -1,7 +1,8 @@
 import { listen } from '@tauri-apps/api/event';
 import { LogicalSize, getCurrentWindow } from '@tauri-apps/api/window';
 import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { api, formatAgo, formatDuration, secondsBetween, type RunAction, type RunView, type View } from './api';
+import { Dog } from './Dog';
+import { api, formatAgo, formatDuration, formatShort, secondsBetween, type RunAction, type RunView, type View } from './api';
 import { Settings, Toggle } from './Settings';
 
 const WIDTH = 380;
@@ -126,13 +127,14 @@ function Running({ item, view, now }: { item: RunView; view: View; now: number }
   const stop = useRunAction(item, 'stop', view.allowActions);
   const p = item.progress;
   const elapsed = secondsBetween(item.run.startedAt, null, now);
+  const summary = p ? `${p.done}/${p.total}${p.etaSecs !== null ? ` \u00b7 ${formatShort(p.etaSecs)}` : ''}` : elapsed !== null ? formatShort(elapsed) : '';
   return (
-    <li className="card">
-      <div className="card-top">
-        <button className="card-head" onClick={() => setOpen(!open)} aria-expanded={open}>
+    <li className={open ? 'run open' : 'run'}>
+      <div className="row">
+        <button className="row-main" onClick={() => setOpen(!open)} aria-expanded={open}>
           <span className="name">{item.run.name}</span>
           <ServerTag view={view} name={item.serverName} />
-          <span className="meta">{elapsed !== null && formatDuration(elapsed)}</span>
+          <span className="meta">{summary}</span>
           <Chevron open={open} />
         </button>
         <span className="hover-actions">
@@ -141,31 +143,31 @@ function Running({ item, view, now }: { item: RunView; view: View; now: number }
         </span>
       </div>
       <Bar fraction={p ? p.fraction : null} />
-      {p && (
-        <div className="detail">
-          <span className="step">{p.currentStep ?? (p.total > 0 && p.done >= p.total ? 'Finishing' : 'Starting')}</span>
-          <span className="meta">
-            {p.done} of {p.total}
-            {p.etaSecs !== null && `, about ${formatDuration(p.etaSecs)} left`}
-          </span>
-        </div>
-      )}
       {stop.bar}
       {open && (
-        <ul className="steps">
-          {item.steps.map((n) => {
-            const d = secondsBetween(n.startedAt, n.finishedAt, now);
-            return (
-              <li key={n.step.name}>
-                <button className="step-link" title="Open this step in Dagu" onClick={() => void api.open(`${item.url}?step=${encodeURIComponent(n.step.name)}`)}>
-                  <i className={`dot s-${n.statusLabel}`} />
-                  <span className="name">{n.step.name}</span>
-                  <span className="meta">{d !== null ? formatDuration(d) : ''}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="run-more">
+          <div className="detail">
+            <span className="step">{p?.currentStep ?? (p && p.total > 0 && p.done >= p.total ? 'Finishing' : 'Starting')}</span>
+            <span className="meta">
+              {elapsed !== null && formatDuration(elapsed)}
+              {p && p.etaSecs !== null && `, about ${formatDuration(p.etaSecs)} left`}
+            </span>
+          </div>
+          <ul className="steps">
+            {item.steps.map((n) => {
+              const d = secondsBetween(n.startedAt, n.finishedAt, now);
+              return (
+                <li key={n.step.name}>
+                  <button className="step-link" title="Open this step in Dagu" onClick={() => void api.open(`${item.url}?step=${encodeURIComponent(n.step.name)}`)}>
+                    <i className={`dot s-${n.statusLabel}`} />
+                    <span className="name">{n.step.name}</span>
+                    <span className="meta">{d !== null ? formatDuration(d) : ''}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
     </li>
   );
@@ -396,6 +398,7 @@ export function App() {
                 {view.serverName}
               </span>
             )}
+            <span className="dog-lane"><Dog asleep={ok && view.running.length === 0 && view.queued.length === 0} /></span>
             <span className="actions">
               {view.serverUrl && (
                 <button className="icon-btn" title="Open Dagu" aria-label="Open Dagu" onClick={() => void api.open(view.serverUrl!)}><Icon d={OPEN} /></button>

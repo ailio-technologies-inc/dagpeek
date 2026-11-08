@@ -1,5 +1,6 @@
 // Sample data for scripts/screenshot.sh. The clock is frozen, so the image only changes when the UI does.
 (() => {
+  window.dagpeekStill = true;
   const T = Date.UTC(2026, 0, 15, 12, 0, 0);
   const RealDate = Date;
   window.Date = class extends RealDate {
