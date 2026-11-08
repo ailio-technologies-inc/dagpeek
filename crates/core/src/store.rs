@@ -64,7 +64,7 @@ pub struct Config {
     pub menu_bar_style: MenuBarStyle,
     /// Show every server's runs together, not only the active one's.
     pub show_all_servers: bool,
-    /// Whether stop, retry and remove from queue are offered. Off until someone turns it on.
+    /// Whether stop, retry and remove from queue are offered.
     pub allow_actions: bool,
     /// Send the anonymous daily active count. On until someone turns it off.
     pub usage_stats: bool,
@@ -74,6 +74,8 @@ pub struct Config {
     pub usage_sent_on: Option<String>,
     /// When the first-run terms were accepted. Nothing is counted before this.
     pub terms_accepted_at: Option<DateTime<Utc>>,
+    /// Set once every feature has been switched on for this install, so a later "off" stays off.
+    pub features_defaulted: bool,
 }
 
 impl Default for Config {
@@ -84,16 +86,17 @@ impl Default for Config {
             hidden_names: vec![],
             hidden_tags: vec![],
             notify_failure: true,
-            notify_completion: false,
+            notify_completion: true,
             failures_seen_at: None,
             failures_seen_by_dag: BTreeMap::new(),
             menu_bar_style: MenuBarStyle::default(),
             show_all_servers: false,
-            allow_actions: false,
+            allow_actions: true,
             usage_stats: true,
             install_id: None,
             usage_sent_on: None,
             terms_accepted_at: None,
+            features_defaulted: false,
         }
     }
 }

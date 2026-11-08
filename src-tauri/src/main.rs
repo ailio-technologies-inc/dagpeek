@@ -784,7 +784,17 @@ async fn check_updates(app: AppHandle) -> Result<String, String> {
 }
 
 fn main() {
-    let config = Config::load().unwrap_or_default();
+    // Every feature is on by default. Installs from before that get it once, and after that
+    // whatever someone turns off stays off.
+    let mut config = Config::load().unwrap_or_default();
+    let first_defaults = !config.features_defaulted;
+    if first_defaults {
+        config.allow_actions = true;
+        config.notify_failure = true;
+        config.notify_completion = true;
+        config.features_defaulted = true;
+        let _ = config.save();
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|_, _, _| {}))
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
@@ -808,7 +818,11 @@ fn main() {
                 hide_popover(window.app_handle());
             }
         })
-        .setup(|app| {
+        .setup(move |app| {
+            if first_defaults {
+                use tauri_plugin_autostart::ManagerExt;
+                let _ = app.autolaunch().enable();
+            }
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
