@@ -134,19 +134,19 @@ pub fn draw_windows(glyph: Glyph, running: usize, failures: usize, dark_taskbar:
     Drawn { rgba: c.px, size: 32 }
 }
 
-/// The macOS title: running, queued and undismissed failures, each only when above zero.
+/// The macOS title, in words: symbols and bare numbers had to be learned. Queued runs only
+/// show when nothing is running, so the title stays short.
 pub fn title(running: usize, queued: usize, failures: usize) -> Option<String> {
     let mut parts = vec![];
     if running > 0 {
-        parts.push(format!("▶{running}"));
-    }
-    if queued > 0 {
-        parts.push(format!("⏸{queued}"));
+        parts.push(format!("{running} running"));
+    } else if queued > 0 {
+        parts.push(format!("{queued} queued"));
     }
     if failures > 0 {
-        parts.push(format!("✕{failures}"));
+        parts.push(format!("{failures} failed"));
     }
-    (!parts.is_empty()).then(|| parts.join(" "))
+    (!parts.is_empty()).then(|| parts.join(", "))
 }
 
 #[cfg(test)]
@@ -173,7 +173,8 @@ mod tests {
     #[test]
     fn title_only_shows_nonzero_counts() {
         assert_eq!(title(0, 0, 0), None);
-        assert_eq!(title(2, 0, 1).as_deref(), Some("▶2 ✕1"));
+        assert_eq!(title(2, 3, 1).as_deref(), Some("2 running, 1 failed"));
+        assert_eq!(title(0, 3, 0).as_deref(), Some("3 queued"));
     }
 
     #[test]

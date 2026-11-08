@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "The popover. Dagu calls and secrets stay in Rust, behind the app's own commands.",
   "windows": ["popover"],
-  "permissions": ["core:default", "autostart:default"]
+  "permissions": ["core:default", "core:window:allow-set-size", "autostart:default"]
 }

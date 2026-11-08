@@ -84,6 +84,7 @@ export const api = {
   deleteServer: (id: string) => invoke<void>('delete_server', { id }),
   setActive: (id: string) => invoke<void>('set_active_server', { id }),
   dismissFailures: () => invoke<void>('dismiss_failures'),
+  dismissFailure: (name: string) => invoke<void>('dismiss_failure', { name }),
   testServer: (url: string, kind: AuthKind, username: string | null, secret: string | null) =>
     invoke<string>('test_server', { url, kind, username, secret }),
   open: (url: string) => invoke<void>('open_url', { url }),
@@ -96,6 +97,15 @@ export function formatDuration(totalSecs: number): string {
   const m = Math.floor(s / 60);
   if (m < 60) return `${m}m ${s % 60}s`;
   return `${Math.floor(m / 60)}h ${m % 60}m`;
+}
+
+/** "Just now", "13m ago", "2h ago", "3d ago": seconds would only make the list flicker. */
+export function formatAgo(secs: number): string {
+  if (secs < 60) return 'Just now';
+  const m = Math.floor(secs / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  return h < 24 ? `${h}h ago` : `${Math.floor(h / 24)}d ago`;
 }
 
 export function secondsBetween(from: string | null, to: string | null, nowMs: number): number | null {

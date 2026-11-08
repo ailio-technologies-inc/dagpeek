@@ -203,9 +203,12 @@ async fn poll_once(app: &AppHandle, watch: &mut Watch) -> Duration {
         .failed
         .iter()
         .filter(|r| visible(r))
-        .filter(|r| match (config.failures_seen_at, r.finished_at) {
-            (Some(seen), Some(done)) => done > seen,
-            _ => true,
+        .filter(|r| {
+            let seen = config.failures_seen_at.into_iter().chain(config.failures_seen_by_dag.get(&r.name).copied()).max();
+            match (seen, r.finished_at) {
+                (Some(seen), Some(done)) => done > seen,
+                _ => true,
+            }
         })
         .cloned()
         .collect();
@@ -264,7 +267,8 @@ fn update_tray(state: &AppState, view: &View) {
     let Some(tray) = guard.as_ref() else { return };
     let running = view.running.len();
     let queued: usize = view.queued.iter().map(|g| g.items.len()).sum();
-    let failures = view.failed.len();
+    // DAGs that are failing, not runs: one DAG failing every 15 minutes is one problem.
+    let failures = view.failed.iter().map(|f| &f.run.name).collect::<HashSet<_>>().len();
 
     let glyph = match &view.connection {
         Connection::Ok if running == 1 => {
@@ -463,6 +467,13 @@ fn dismiss_failures(state: State<AppState>) -> Result<(), String> {
     store(&state, |c| c.failures_seen_at = Some(Utc::now()))
 }
 
+#[tauri::command]
+fn dismiss_failure(state: State<AppState>, name: String) -> Result<(), String> {
+    store(&state, |c| {
+        c.failures_seen_by_dag.insert(name, Utc::now());
+    })
+}
+
 /// Tries a server before it is saved. Reports the same states the tray would show.
 #[tauri::command]
 async fn test_server(url: String, kind: AuthKind, username: Option<String>, secret: Option<String>) -> Result<String, String> {
@@ -520,7 +531,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             get_view, get_config, save_prefs, save_server, delete_server, set_active_server,
-            dismiss_failures, test_server, open_url, quit
+            dismiss_failures, dismiss_failure, test_server, open_url, quit
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Focused(false) = event {

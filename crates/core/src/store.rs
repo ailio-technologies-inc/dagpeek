@@ -1,6 +1,7 @@
 //! The server list and settings on disk, shared by the app and the CLI. Secrets are never in
 //! this file: they live in the macOS Keychain or Windows Credential Manager.
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
@@ -43,6 +44,8 @@ pub struct Config {
     pub notify_completion: bool,
     /// Failures finished before this time have been dismissed.
     pub failures_seen_at: Option<DateTime<Utc>>,
+    /// The same, for one DAG dismissed on its own.
+    pub failures_seen_by_dag: BTreeMap<String, DateTime<Utc>>,
 }
 
 impl Default for Config {
@@ -55,6 +58,7 @@ impl Default for Config {
             notify_failure: true,
             notify_completion: false,
             failures_seen_at: None,
+            failures_seen_by_dag: BTreeMap::new(),
         }
     }
 }
