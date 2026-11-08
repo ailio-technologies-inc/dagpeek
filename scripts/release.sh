@@ -66,6 +66,16 @@ build_app() {
   pnpm exec tauri build --target "$TARGET" --bundles app,dmg || fail "app build, signing or notarization failed"
 }
 
+# Unsigned for now, so Windows SmartScreen warns about an unknown publisher.
+build_windows() {
+  PATH="$(brew --prefix llvm)/bin:$HOME/.cargo/bin:$PATH"
+  cargo xwin build --release -p dagpeek --target x86_64-pc-windows-msvc || fail "Windows CLI build failed"
+  cp target/x86_64-pc-windows-msvc/release/dagpeek.exe target/sidecar/dagpeek-x86_64-pc-windows-msvc.exe
+  pnpm exec tauri build --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis || fail "Windows build failed"
+  WIN_EXE="target/x86_64-pc-windows-msvc/release/bundle/nsis/Dagpeek_${VERSION}_x64-setup.exe"
+  [ -f "$WIN_EXE" ] && [ -f "$WIN_EXE.sig" ] || fail "no Windows installer or signature for $VERSION"
+}
+
 staple_dmg() {
   DMG="$BUNDLE/dmg/Dagpeek_${VERSION}_universal.dmg"
   [ -f "$DMG" ] || fail "no dmg for $VERSION at $DMG"
@@ -90,13 +100,16 @@ collect() {
   rm -rf "$OUT"; mkdir -p "$OUT"
   cp "$DMG" "$OUT/Dagpeek-mac.dmg"
   cp "$BUNDLE/macos/Dagpeek.app.tar.gz" "$OUT/Dagpeek-mac.app.tar.gz"
+  cp "$WIN_EXE" "$OUT/Dagpeek-windows-setup.exe"
+  WIN_SIG=$(cat "$WIN_EXE.sig")
+  WIN_URL="https://github.com/$REPO/releases/download/v$VERSION/Dagpeek-windows-setup.exe"
   SIG=$(cat "$BUNDLE/macos/Dagpeek.app.tar.gz.sig")
   SHA=$(shasum -a 256 "$OUT/Dagpeek-mac.dmg" | cut -d' ' -f1)
   URL="https://github.com/$REPO/releases/download/v$VERSION/Dagpeek-mac.app.tar.gz"
-  jq -n --arg v "$VERSION" --arg d "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg s "$SIG" --arg u "$URL" \
-    '{version:$v, pub_date:$d, platforms:{"darwin-aarch64":{signature:$s,url:$u},"darwin-x86_64":{signature:$s,url:$u}}}' \
+  jq -n --arg v "$VERSION" --arg d "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg s "$SIG" --arg u "$URL" --arg ws "$WIN_SIG" --arg wu "$WIN_URL" \
+    '{version:$v, pub_date:$d, platforms:{"darwin-aarch64":{signature:$s,url:$u},"darwin-x86_64":{signature:$s,url:$u},"windows-x86_64":{signature:$ws,url:$wu}}}' \
     > "$OUT/latest.json"
-  (cd "$OUT" && shasum -a 256 Dagpeek-mac.dmg Dagpeek-mac.app.tar.gz > SHA256SUMS.txt)
+  (cd "$OUT" && shasum -a 256 Dagpeek-mac.dmg Dagpeek-mac.app.tar.gz Dagpeek-windows-setup.exe > SHA256SUMS.txt)
 }
 
 publish() {
@@ -123,6 +136,7 @@ build_cli
 build_app
 staple_dmg
 verify
+build_windows
 collect
 publish
 update_cask

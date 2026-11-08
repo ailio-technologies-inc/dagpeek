@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dagpeek: Dagu in your menu bar</title>
-<meta name="description" content="Dagpeek is a free Mac menu bar app that shows what your Dagu server is running, what's queued and what failed.">
+<meta name="description" content="Dagpeek is a free menu bar and tray app for Mac and Windows that shows what your Dagu server is running, what's queued and what failed.">
 <link rel="canonical" href="https://dagpeek.com/">
 <link rel="icon" href="/favicon.ico" sizes="48x48">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta property="og:title" content="Dagpeek: Dagu in your menu bar">
-<meta property="og:description" content="See what your Dagu server is running, what's queued and what failed. Free, for Mac.">
+<meta property="og:description" content="See what your Dagu server is running, what's queued and what failed. Free, for Mac and Windows.">
 <meta property="og:url" content="https://dagpeek.com/">
 <meta property="og:image" content="https://dagpeek.com/icon.png">
 <link rel="stylesheet" href="/site.css">
@@ -29,7 +29,8 @@
   <p class="lede">Dagpeek shows what your Dagu server is running, what's queued and what failed, without opening the web UI.</p>
   <div class="get">
     <a class="button" href="https://github.com/ailio-technologies-inc/dagpeek/releases/latest/download/Dagpeek-mac.dmg">Download for Mac</a>
-    <span>Free and open source. macOS 13 or later.</span>
+    <a class="button alt" href="https://github.com/ailio-technologies-inc/dagpeek/releases/latest/download/Dagpeek-windows-setup.exe">Download for Windows</a>
+    <span>Free and open source. macOS 13 or later, Windows 10 or 11.</span>
   </div>
 
   <div class="shot" role="img" aria-label="The Dagpeek popover open under the menu bar, showing one running job and failures grouped by DAG">
@@ -84,7 +85,7 @@
     </section>
     <section>
       <h2>Private</h2>
-      <p>The app only talks to your servers, its update feed and an anonymous daily usage count you can turn off in Settings. Nothing about your servers or runs is included. Passwords and tokens stay in your Keychain.</p>
+      <p>The app only talks to your servers, its update feed and an anonymous daily usage count you can turn off in Settings. Nothing about your servers or runs is included. Passwords and tokens stay in your system's credential store.</p>
     </section>
     <section>
       <h2>Act on runs</h2>
@@ -102,7 +103,7 @@
 
   <h2 class="install" id="install">Install with Homebrew</h2>
   <pre><code>brew install --cask ailio-technologies-inc/tap/dagpeek</code></pre>
-  <p class="later">A Windows version is on the way.</p>
+  <p class="later">On Windows, SmartScreen may warn that the publisher is unknown, because the installer isn't signed yet. Choose More info, then Run anyway.</p>
 </main>
 
 <footer>

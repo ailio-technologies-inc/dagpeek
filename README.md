@@ -1,6 +1,6 @@
 # Dagpeek
 
-See what your [Dagu](https://dagu.sh) server is doing without opening Dagu. A free menu bar app for Mac, by [Ailio](https://ailio.ca). Windows is on the way.
+See what your [Dagu](https://dagu.sh) server is doing without opening Dagu. A free menu bar and tray app for Mac and Windows, by [Ailio](https://ailio.ca).
 
 It shows what's running, what's queued, what failed since you last looked, and how far each run has got, across one Dagu server or all of them.
 
@@ -12,7 +12,9 @@ It shows what's running, what's queued, what failed since you last looked, and h
 brew install --cask ailio-technologies-inc/tap/dagpeek
 ```
 
-Or download it from [dagpeek.com](https://dagpeek.com). It needs macOS 13 or later.
+Or download it from [dagpeek.com](https://dagpeek.com). It needs macOS 13 or later, or Windows 10 or 11.
+
+The Windows installer isn't signed yet, so SmartScreen may warn about an unknown publisher. Choose More info, then Run anyway.
 
 ## Use it
 
