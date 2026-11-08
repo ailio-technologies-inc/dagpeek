@@ -12,6 +12,7 @@
 <meta property="og:url" content="https://dagpeek.com/">
 <meta property="og:image" content="https://dagpeek.com/icon.png">
 <link rel="stylesheet" href="/site.css">
+<script src="/site.js" defer></script>
 </head>
 <body>
 <div class="page">
@@ -96,8 +97,16 @@
 
 <footer>
   <p>MIT licensed. Made by <a href="https://ailio.ca">Ailio</a>. An independent app for <a href="https://dagu.sh">Dagu</a>, not affiliated with the Dagu project.</p>
+  <p>This website uses Google Analytics if you allow it. The app has none. <button type="button" class="link-button" id="cookie-choices">Change your choice</button></p>
 </footer>
 
+</div>
+<div class="consent" id="consent" role="region" aria-label="Analytics choice" hidden>
+  <p>Can we use Google Analytics to count visits to this website?</p>
+  <div class="choices">
+    <button type="button" data-choice="denied">No</button>
+    <button type="button" class="yes" data-choice="granted">Allow</button>
+  </div>
 </div>
 </body>
 </html>
