@@ -1,6 +1,7 @@
 // No console window on Windows in release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg_attr(target_os = "macos", allow(dead_code))]
 mod tray_icon;
 
 use std::collections::{HashMap, HashSet};
@@ -25,6 +26,7 @@ use tray_icon::Glyph;
 
 const HISTORY_TTL: Duration = Duration::from_secs(30 * 60);
 const POPOVER_GAP: f64 = 8.0;
+const UPDATE_INTERVAL: Duration = Duration::from_secs(6 * 60 * 60);
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -503,13 +505,47 @@ fn quit(app: AppHandle) {
     app.exit(0);
 }
 
-async fn check_for_update(app: AppHandle) {
+/// Installs a newer version if there is one, and returns its number.
+async fn install_update(app: &AppHandle) -> Result<Option<String>, String> {
     use tauri_plugin_updater::UpdaterExt;
-    let Ok(updater) = app.updater() else { return };
-    if let Ok(Some(update)) = updater.check().await {
-        if update.download_and_install(|_, _| {}, || {}).await.is_ok() {
-            notify(&app, "Dagpeek updated", "The new version starts next time you open it.");
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    let Some(update) = updater.check().await.map_err(|e| e.to_string())? else {
+        return Ok(None);
+    };
+    let version = update.version.clone();
+    update.download_and_install(|_, _| {}, || {}).await.map_err(|e| e.to_string())?;
+    Ok(Some(version))
+}
+
+/// Restarts into an installed update. A menu bar app is rarely opened again, so waiting for
+/// its next launch could mean months. It waits for the popover to close, so nothing vanishes
+/// from under someone reading it.
+async fn restart_when_idle(app: AppHandle, version: String) {
+    notify(&app, "Dagpeek updated", &format!("Now on version {version}."));
+    while *app.state::<AppState>().popover_open.lock().unwrap() {
+        tokio::time::sleep(Duration::from_secs(5)).await;
+    }
+    app.restart();
+}
+
+async fn update_loop(app: AppHandle) {
+    tokio::time::sleep(Duration::from_secs(5)).await;
+    loop {
+        if let Ok(Some(version)) = install_update(&app).await {
+            restart_when_idle(app.clone(), version).await;
         }
+        tokio::time::sleep(UPDATE_INTERVAL).await;
+    }
+}
+
+#[tauri::command]
+async fn check_updates(app: AppHandle) -> Result<String, String> {
+    match install_update(&app).await? {
+        Some(version) => {
+            tauri::async_runtime::spawn(restart_when_idle(app, version.clone()));
+            Ok(format!("Version {version} is installed. Dagpeek restarts when you close this."))
+        }
+        None => Ok("Dagpeek is up to date.".to_string()),
     }
 }
 
@@ -531,7 +567,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             get_view, get_config, save_prefs, save_server, delete_server, set_active_server,
-            dismiss_failures, dismiss_failure, test_server, open_url, quit
+            dismiss_failures, dismiss_failure, test_server, open_url, check_updates, quit
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Focused(false) = event {
@@ -570,7 +606,7 @@ fn main() {
             *app.state::<AppState>().tray.lock().unwrap() = Some(tray);
 
             tauri::async_runtime::spawn(poll_loop(app.handle().clone()));
-            tauri::async_runtime::spawn(check_for_update(app.handle().clone()));
+            tauri::async_runtime::spawn(update_loop(app.handle().clone()));
             Ok(())
         })
         .run(tauri::generate_context!())

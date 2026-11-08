@@ -88,6 +88,7 @@ export const api = {
   testServer: (url: string, kind: AuthKind, username: string | null, secret: string | null) =>
     invoke<string>('test_server', { url, kind, username, secret }),
   open: (url: string) => invoke<void>('open_url', { url }),
+  checkUpdates: () => invoke<string>('check_updates'),
   quit: () => invoke<void>('quit'),
 };
 
