@@ -1,0 +1,15 @@
+{
+  "$schema": "https://unpkg.com/wrangler/config-schema.json",
+  // dagpeek.com: the landing page. Static assets, plus src/index.js for the www redirect.
+  "name": "dagpeek-site",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "triggers": { "crons": [] },
+  "assets": { "directory": "public", "binding": "ASSETS", "not_found_handling": "404-page", "run_worker_first": true },
+  "routes": [
+    { "pattern": "dagpeek.com", "custom_domain": true },
+    { "pattern": "www.dagpeek.com", "custom_domain": true }
+  ]
+}

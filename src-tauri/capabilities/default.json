@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "The popover. Dagu calls and secrets stay in Rust, behind the app's own commands.",
+  "windows": ["popover"],
+  "permissions": ["core:default", "autostart:default"]
+}

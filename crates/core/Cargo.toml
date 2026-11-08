@@ -1,0 +1,20 @@
+[package]
+name = "dagpeek-core"
+description = "Dagu API client, progress and ETA logic shared by the Dagpeek app and CLI"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+chrono.workspace = true
+dirs.workspace = true
+keyring.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+urlencoding.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

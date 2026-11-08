@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dagpeek: Dagu in your menu bar</title>
+<meta name="description" content="A free menu bar and tray app for Mac and Windows. See what your Dagu server is running, what's queued, what failed, and how far each run has got.">
+<link rel="canonical" href="https://dagpeek.com/">
+<link rel="icon" href="/icon.png">
+<meta property="og:title" content="Dagpeek: Dagu in your menu bar">
+<meta property="og:description" content="See what your Dagu server is doing without opening Dagu. Free, for Mac and Windows.">
+<meta property="og:url" content="https://dagpeek.com/">
+<meta property="og:image" content="https://dagpeek.com/icon.png">
+<link rel="preload" href="/fonts/funnel-display.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+
+<div class="desktop">
+  <div class="menubar" aria-hidden="true">
+    <span class="menubar-app">Terminal</span>
+    <span class="menubar-tray">
+      <svg class="tray-ring" viewBox="0 0 22 22"><circle cx="11" cy="11" r="8" class="ring-track"/><circle cx="11" cy="11" r="8" class="ring-fill" pathLength="100" transform="rotate(-90 11 11)"/></svg>
+      <span class="tray-counts"><span>▶2</span> <span>⏸1</span> <span class="tray-fail">✕1</span></span>
+    </span>
+  </div>
+
+  <header class="hero">
+    <div class="hero-copy">
+      <p class="brand"><img src="/icon.png" alt="" width="36" height="36">Dagpeek</p>
+      <h1>See what Dagu is doing without opening Dagu</h1>
+      <p class="lede">A free menu bar and tray app for Mac and Windows. What's running, what's queued, what failed, and how far each run has got.</p>
+      <div class="install" id="install">
+        <p class="install-label">Install on a Mac with Homebrew</p>
+        <pre><code>brew install --cask ailio-technologies-inc/tap/dagpeek</code></pre>
+        <div class="downloads">
+          <a class="button" href="https://github.com/ailio-technologies-inc/dagpeek/releases/latest/download/Dagpeek-mac.dmg">Download for Mac</a>
+          <a class="button" href="https://github.com/ailio-technologies-inc/dagpeek/releases/latest/download/Dagpeek-windows-setup.exe">Download for Windows</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="popover" aria-hidden="true">
+      <div class="pop-section">
+        <h3 class="pop-fail">Failed</h3>
+        <div class="pop-row"><span>nightly-backup</span><span class="pop-meta">4m ago</span></div>
+      </div>
+      <div class="pop-section">
+        <h3>Running</h3>
+        <div class="pop-row"><span>deploy-web</span><span class="pop-meta">2m 41s</span></div>
+        <div class="bar"><span class="bar-fill"></span></div>
+        <div class="pop-detail"><span>run-migrations</span><span>4 of 6 steps, about 1m 10s left</span></div>
+        <div class="pop-row pop-gap"><span>load-warehouse</span><span class="pop-meta">38s</span></div>
+        <div class="bar"><span class="bar-still"></span></div>
+        <div class="pop-detail"><span>extract</span><span>1 of 5 steps</span></div>
+      </div>
+      <div class="pop-section">
+        <h3>Queued: reports</h3>
+        <div class="pop-row"><span>weekly-summary</span><span class="pop-meta">#1</span></div>
+      </div>
+      <div class="pop-foot"><span>Production</span><span>Open Dagu</span></div>
+    </div>
+  </header>
+</div>
+
+<main>
+  <section class="feature">
+    <h2>A number you can trust</h2>
+    <p>Progress comes from the steps Dagu reports. Time left is the typical length of each remaining step over that DAG's last 10 successful runs. With fewer than 3 runs to go on, Dagpeek shows no estimate at all.</p>
+    <p>If it can't reach your server it says so. It never shows "0 running" when the truth is that it doesn't know.</p>
+  </section>
+
+  <section class="feature">
+    <h2>It stays out of the way</h2>
+    <p>Failures since you last looked sit at the top until you dismiss them. Hide the noisy DAGs by name or tag, and they stop notifying you too. Choose whether you hear about failures, finished runs, or both.</p>
+  </section>
+
+  <section class="feature">
+    <h2>Nothing leaves your machine</h2>
+    <p>Dagpeek talks to the servers you add and to its update feed, and nothing else. There is no account, no analytics and no telemetry. Passwords and tokens stay in your Mac's Keychain or Windows Credential Manager.</p>
+  </section>
+
+  <section class="feature">
+    <h2>Also in your terminal</h2>
+    <p>The same servers, from the <code>dagpeek</code> command.</p>
+<pre class="terminal"><code>$ dagpeek status
+2 running, 1 queued, 1 failed in the last day
+  deploy-web: 4 of 6 steps, on run-migrations, about 70s left
+  load-warehouse: 1 of 5 steps, on extract</code></pre>
+  </section>
+</main>
+
+<footer class="foot">
+  <p>Free and open source under the MIT license. <a href="https://github.com/ailio-technologies-inc/dagpeek">Source on GitHub</a>.</p>
+  <p>Made by <a href="https://ailio.ca">Ailio</a>. Dagpeek is an independent app for <a href="https://dagu.sh">Dagu</a> and isn't affiliated with the Dagu project.</p>
+</footer>
+
+</body>
+</html>
