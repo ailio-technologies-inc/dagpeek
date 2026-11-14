@@ -14,7 +14,10 @@ code, pre { font-family: ui-monospace, Menlo, Consolas, monospace; }
 
 h1 { margin-top: 44px; font-size: clamp(36px, 6vw, 44px); font-weight: 700; line-height: 1.08; letter-spacing: -0.022em; }
 .lede { margin-top: 14px; max-width: 36em; font-size: 20px; line-height: 1.4; color: #424245; }
-.get { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-top: 24px; font-size: 15px; color: #6e6e73; }
+.get { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px 20px; margin-top: 24px; font-size: 14px; line-height: 1.45; color: #6e6e73; }
+.dl { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.dl.win { max-width: 21em; }
+.release { margin-top: 16px; font-size: 14px; color: #6e6e73; }
 .button { display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 8px; background: #1d1d1f; color: #fff; font-size: 16px; font-weight: 600; text-decoration: none; }
 .button:hover { background: #3a3a3c; color: #fff; }
 .button.alt { background: #f0f0f3; color: #1d1d1f; }
@@ -25,8 +28,14 @@ h1 { margin-top: 44px; font-size: clamp(36px, 6vw, 44px); font-weight: 700; line
 .tray, .status { display: flex; align-items: center; }
 .tray { gap: 18px; font-variant-numeric: tabular-nums; }
 .status { gap: 6px; }
-.desk { display: flex; justify-content: flex-end; padding: 8px 20px 36px; }
-.pop { width: 360px; max-width: 100%; border-radius: 12px; background: #f8f8fa; color: #1b1e25; box-shadow: 0 16px 44px rgba(10, 25, 50, 0.35); font-size: 13px; line-height: 1.4; }
+.desk { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding: 8px 20px 36px; }
+.term { flex: 1; max-width: 420px; margin-top: 40px; border-radius: 10px; overflow: hidden; background: #1b1e25; box-shadow: 0 16px 44px rgba(10, 25, 50, 0.35); }
+.term-bar { display: flex; gap: 7px; padding: 10px 12px; background: #2a2e37; }
+.term-bar i { width: 11px; height: 11px; border-radius: 50%; background: #4a4f5a; }
+.term pre { padding: 12px 14px 14px; border-radius: 0; background: none; color: #e6e8ec; font-size: 12px; line-height: 1.6; white-space: pre-wrap; overflow: visible; }
+.term .prompt { color: #12a06e; }
+.term .cursor { display: inline-block; width: 7px; height: 14px; vertical-align: -2px; background: #e6e8ec; }
+.pop { flex: none; width: 360px; max-width: 100%; border-radius: 12px; background: #f8f8fa; color: #1b1e25; box-shadow: 0 16px 44px rgba(10, 25, 50, 0.35); font-size: 13px; line-height: 1.4; }
 .pop-body { display: flex; flex-direction: column; gap: 14px; padding: 12px 10px 8px; }
 .head { display: flex; justify-content: space-between; padding: 0 6px 4px; font-size: 12px; font-weight: 600; color: #6a7280; }
 .head .plain { font-weight: 400; }
@@ -51,7 +60,6 @@ h1 { margin-top: 44px; font-size: clamp(36px, 6vw, 44px); font-weight: 700; line
 
 .install { margin: 64px 0 8px; font-size: 24px; font-weight: 700; letter-spacing: -0.012em; }
 pre { padding: 13px 15px; border-radius: 8px; background: #f5f5f7; overflow-x: auto; font-size: 14px; }
-.later { margin-top: 10px; font-size: 15px; color: #6e6e73; }
 
 footer { margin-top: 72px; padding: 20px 0 40px; border-top: 1px solid #e5e5ea; font-size: 14px; color: #6e6e73; }
 
@@ -67,6 +75,11 @@ footer p + p { margin-top: 4px; }
 .legal main h2 { margin: 28px 0 4px; font-size: 18px; font-weight: 650; }
 .legal main p { color: #424245; }
 .legal .lede { font-size: 19px; }
+
+@media (max-width: 760px) {
+  .desk { justify-content: flex-end; }
+  .term { display: none; }
+}
 
 @media (max-width: 520px) {
   .desk { padding: 8px 10px 20px; }

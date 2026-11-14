@@ -9,10 +9,25 @@
 <link rel="icon" href="/favicon.ico" sizes="48x48">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Dagpeek">
 <meta property="og:title" content="Dagpeek: Dagu in your menu bar">
 <meta property="og:description" content="See what your Dagu server is running, what's queued and what failed. Free, for Mac and Windows.">
 <meta property="og:url" content="https://dagpeek.com/">
-<meta property="og:image" content="https://dagpeek.com/icon.png">
+<meta property="og:image" content="https://dagpeek.com/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The Dagpeek popover showing one running job and failures grouped by DAG">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Dagpeek: Dagu in your menu bar">
+<meta name="twitter:description" content="See what your Dagu server is running, what's queued and what failed. Free, for Mac and Windows.">
+<meta name="twitter:image" content="https://dagpeek.com/og.png">
+<meta name="twitter:image:alt" content="The Dagpeek popover showing one running job and failures grouped by DAG">
+<!-- src/index.js adds softwareVersion from the updater feed. -->
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Dagpeek","description":"A free menu bar and tray app for Mac and Windows that shows what your Dagu server is running, what's queued and what failed.","url":"https://dagpeek.com/","image":"https://dagpeek.com/og.png","operatingSystem":"macOS, Windows","applicationCategory":"DeveloperApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"CAD"},"downloadUrl":["https://github.com/ailio-technologies-inc/dagpeek/releases/latest/download/Dagpeek-mac.dmg","https://github.com/ailio-technologies-inc/dagpeek/releases/latest/download/Dagpeek-windows-setup.exe"],"license":"https://opensource.org/licenses/MIT","publisher":{"@type":"Organization","@id":"https://ailio.ca/#organization","name":"Ailio Technologies Inc.","url":"https://ailio.ca/","address":{"@type":"PostalAddress","addressLocality":"Victoria","addressRegion":"BC","addressCountry":"CA"},"sameAs":["https://clinicly.ca/","https://tailfuse.com/","https://dagpeek.com/","https://heytownhall.com/","https://daycarenearyou.ca/","https://careinyourlanguage.ca/","https://crenel.ca/","https://hunch.money/","https://framethat.art/","https://abuzz.earth/","https://trailmix.camp/","https://github.com/ailio-technologies-inc"]}}
+</script>
 <link rel="stylesheet" href="/site.css">
 <script src="/site.js" defer></script>
 </head>
@@ -28,12 +43,18 @@
   <h1>Dagu in your menu bar.</h1>
   <p class="lede">Dagpeek shows what your Dagu server is running, what's queued and what failed, without opening the web UI.</p>
   <div class="get">
-    <a class="button" href="https://github.com/ailio-technologies-inc/dagpeek/releases/latest/download/Dagpeek-mac.dmg">Download for Mac</a>
-    <a class="button alt" href="https://github.com/ailio-technologies-inc/dagpeek/releases/latest/download/Dagpeek-windows-setup.exe">Download for Windows</a>
-    <span>Free and open source. macOS 13 or later, Windows 10 or 11.</span>
+    <div class="dl">
+      <a class="button" href="https://github.com/ailio-technologies-inc/dagpeek/releases/latest/download/Dagpeek-mac.dmg">Download for Mac</a>
+      <p>macOS 13 or later.</p>
+    </div>
+    <div class="dl win">
+      <a class="button alt" href="https://github.com/ailio-technologies-inc/dagpeek/releases/latest/download/Dagpeek-windows-setup.exe">Download for Windows</a>
+      <p id="smartscreen">Windows 10 or 11. The installer isn't signed yet, so SmartScreen may say the publisher is unknown. Choose More info, then Run anyway.</p>
+    </div>
   </div>
+  <p class="release">Free and open source. <span data-release></span><a href="https://github.com/ailio-technologies-inc/dagpeek/releases">Release notes on GitHub</a></p>
 
-  <div class="shot" role="img" aria-label="The Dagpeek popover open under the menu bar, showing one running job and failures grouped by DAG">
+  <div class="shot" role="img" aria-label="The Dagpeek popover open under the menu bar, showing one running job and failures grouped by DAG, next to a terminal running dagpeek status">
     <div class="bar-top">
       <b>Terminal</b>
       <span class="tray">
@@ -42,6 +63,13 @@
       </span>
     </div>
     <div class="desk">
+      <div class="term" aria-hidden="true">
+        <div class="term-bar"><i></i><i></i><i></i></div>
+        <pre><span class="prompt">$</span> dagpeek status
+1 running, 0 queued, 13 failed in the last day
+  deploy-web: 3 of 6 steps, on test, about 330s left
+<span class="prompt">$</span> <span class="cursor"></span></pre>
+      </div>
       <div class="pop">
         <div class="pop-body">
           <div>
@@ -103,11 +131,11 @@
 
   <h2 class="install" id="install">Install with Homebrew</h2>
   <pre><code>brew install --cask ailio-technologies-inc/tap/dagpeek</code></pre>
-  <p class="later">On Windows, SmartScreen may warn that the publisher is unknown, because the installer isn't signed yet. Choose More info, then Run anyway.</p>
 </main>
 
 <footer>
-  <p><a href="/terms">Terms and privacy</a>. MIT licensed. Made by <a href="https://ailio.ca">Ailio</a>. An independent app for <a href="https://dagu.sh">Dagu</a>, not affiliated with the Dagu project.</p>
+  <p><a href="/terms">Terms and privacy</a>. MIT licensed. Made by <a href="https://ailio.ca/">Ailio Technologies Inc.</a> in Victoria, BC. An independent app for <a href="https://dagu.sh">Dagu</a>, not affiliated with the Dagu project.</p>
+  <p>Also by Ailio: <a href="https://tailfuse.com">Tailfuse</a>, several Tailscale tailnets at once. <a href="https://ailio.ca/">More from Ailio</a></p>
   <p>This website uses Google Analytics. <button type="button" class="link-button" id="cookie-choices">Change your choice</button></p>
 </footer>
 
