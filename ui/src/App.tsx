@@ -333,7 +333,7 @@ function Terms() {
   return (
     <div className="settings">
       <header><h2>Welcome to Dagpeek</h2></header>
-      <p className="note">By continuing, you agree to the <button className="inline-link" onClick={() => void api.open('https://dagpeek.com/terms')}>terms and privacy notice</button>.</p>
+      <p className="note">By continuing, you agree to the <button className="inline-link" onClick={() => void api.open('https://dagpeek.com/terms')}>terms</button> and <button className="inline-link" onClick={() => void api.open('https://dagpeek.com/privacy')}>privacy notice</button>.</p>
       <p className="note">Once a day Dagpeek sends a usage count to Google Analytics: a random ID, the app version and your OS. It never includes your servers, DAGs or runs.</p>
       <div className="set-group"><Toggle label="Share anonymous usage count" checked={share} onChange={setShare} /></div>
       <div className="buttons">
