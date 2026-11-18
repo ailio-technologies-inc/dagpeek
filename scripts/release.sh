@@ -4,6 +4,12 @@
 # Needs: the Developer ID certificate, the `dagpeek` notarytool profile, the App Store Connect key in
 # ~/.appstoreconnect/private_keys, the updater key at ~/.tauri/dagpeek.key, and a sibling-free clone of
 # ailio-technologies-inc/homebrew-tap (it is cloned to a temp directory here).
+#
+# This is the local fallback. The usual release is the cluster's: pushing a v* tag starts
+# .github/workflows/release.yml (the unsigned builds), and infra's host/dagpeek-notarize signs, notarizes and
+# publishes them (infra docs/agents/dagpeek-release.md). This script pushes the same tag, so both lanes also run
+# and replace each other's assets under the same names; use it when the cluster is down, and expect the
+# release to be created by whichever lane gets there first.
 set -euo pipefail
 
 VERSION="${1:?usage: scripts/release.sh <version>}"
@@ -114,9 +120,12 @@ collect() {
 
 publish() {
   git tag -f "v$VERSION" && git push -f origin "v$VERSION"
-  gh release create "v$VERSION" --repo "$REPO" --title "Dagpeek $VERSION" \
-    --notes "Download the app from https://dagpeek.com or install it with Homebrew." "$OUT"/* \
+  # The Actions workflow may have made the release already, from the same tag push.
+  gh release view "v$VERSION" --repo "$REPO" >/dev/null 2>&1 \
+    || gh release create "v$VERSION" --repo "$REPO" --title "Dagpeek $VERSION" \
+      --notes "Download the app from https://dagpeek.com or install it with Homebrew." \
     || fail "could not create the GitHub release"
+  gh release upload "v$VERSION" --repo "$REPO" --clobber "$OUT"/* || fail "could not upload the release assets"
 }
 
 update_cask() {
