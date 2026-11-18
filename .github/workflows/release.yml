@@ -1,0 +1,160 @@
+name: Release
+
+# Builds the unsigned installers for a v* tag. Signing happens on the Ailio cluster, not here:
+# infra's docs/agents/dagpeek-release.md (host/dagpeek-notarize). The cluster's webhook sees the same tag
+# push, waits for the two assets below, signs and notarizes the Mac app with the Developer ID, signs both
+# updater bundles with the updater key, and publishes Dagpeek-mac.zip, Dagpeek-mac.app.tar.gz,
+# Dagpeek-windows-setup.exe(.sig), latest.json and SHA256SUMS.txt, then moves the Homebrew cask. The
+# Dagpeek-mac.dmg comes last, from dmg.yml, built around the notarized app.
+#
+# This workflow holds no signing secret. scripts/release.sh is still the local way to build, sign and
+# publish everything by hand from the owner's Mac.
+#
+# Assets uploaded here (the cluster replaces or removes them):
+#   Dagpeek-mac-unsigned.app.tar.gz   the universal app, ad-hoc signed, with the CLI sidecars
+#   Dagpeek-windows-setup.exe         the NSIS installer (unsigned; the cluster adds the updater .sig)
+#
+# A run that is not on a tag (workflow_dispatch on a branch) builds both and keeps them as workflow
+# artifacts, without touching a release.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  mac:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: The tag matches the version in the repo
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          grep -q "\"version\": \"$VERSION\"" src-tauri/tauri.conf.json \
+            || { echo "src-tauri/tauri.conf.json is not at $VERSION" >&2; exit 1; }
+          grep -q "^version = \"$VERSION\"" Cargo.toml \
+            || { echo "Cargo.toml is not at $VERSION" >&2; exit 1; }
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: swatinem/rust-cache@v2
+        with:
+          shared-key: release-mac
+          save-if: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Compiled in for the daily usage count (a build without it sends nothing)
+        env:
+          GA: ${{ secrets.DAGPEEK_GA_API_SECRET }}
+        run: |
+          if [ -n "$GA" ]; then echo "DAGPEEK_GA_API_SECRET=$GA" >> "$GITHUB_ENV"; fi
+      - name: The CLI sidecars (scripts/release.sh build_cli)
+        run: |
+          cargo build --release -p dagpeek --target aarch64-apple-darwin
+          cargo build --release -p dagpeek --target x86_64-apple-darwin
+          mkdir -p target/sidecar
+          # Tauri builds each architecture, then the universal app, and wants the command for all three.
+          cp target/aarch64-apple-darwin/release/dagpeek target/sidecar/dagpeek-aarch64-apple-darwin
+          cp target/x86_64-apple-darwin/release/dagpeek target/sidecar/dagpeek-x86_64-apple-darwin
+          lipo -create -output target/sidecar/dagpeek-universal-apple-darwin \
+            target/aarch64-apple-darwin/release/dagpeek target/x86_64-apple-darwin/release/dagpeek
+      - name: The universal app, ad-hoc signed (scripts/release.sh build_app, minus signing)
+        run: |
+          # No Developer ID and no notarization credentials here: the cluster signs. The updater bundle is made
+          # there too, from the notarized app, so this build needs no updater key.
+          pnpm exec tauri build --target universal-apple-darwin --bundles app \
+            --config '{"bundle":{"createUpdaterArtifacts":false,"macOS":{"signingIdentity":"-"}}}'
+          mkdir -p dist
+          tar -czf dist/Dagpeek-mac-unsigned.app.tar.gz \
+            -C target/universal-apple-darwin/release/bundle/macos Dagpeek.app
+      - uses: actions/upload-artifact@v4
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        with:
+          name: dagpeek-mac-unsigned
+          path: dist/Dagpeek-mac-unsigned.app.tar.gz
+      - name: Create the release if absent
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            || gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+              --title "Dagpeek ${GITHUB_REF_NAME#v}" \
+              --notes "Download the app from https://dagpeek.com or install it with Homebrew."
+      - name: Upload the unsigned app
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber \
+            dist/Dagpeek-mac-unsigned.app.tar.gz
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: swatinem/rust-cache@v2
+        with:
+          shared-key: release-windows
+          save-if: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Compiled in for the daily usage count (a build without it sends nothing)
+        env:
+          GA: ${{ secrets.DAGPEEK_GA_API_SECRET }}
+        run: |
+          if [ -n "$GA" ]; then echo "DAGPEEK_GA_API_SECRET=$GA" >> "$GITHUB_ENV"; fi
+      - name: The installer (scripts/release.sh build_windows)
+        run: |
+          VERSION=$(grep -m1 '"version"' src-tauri/tauri.conf.json | sed 's/.*: "\(.*\)".*/\1/')
+          cargo build --release -p dagpeek --target x86_64-pc-windows-msvc
+          mkdir -p target/sidecar dist
+          cp target/x86_64-pc-windows-msvc/release/dagpeek.exe target/sidecar/dagpeek-x86_64-pc-windows-msvc.exe
+          # Unsigned (SmartScreen warns of an unknown publisher). The cluster signs the updater side, so no key here.
+          pnpm exec tauri build --target x86_64-pc-windows-msvc --bundles nsis \
+            --config '{"bundle":{"createUpdaterArtifacts":false}}'
+          EXE="target/x86_64-pc-windows-msvc/release/bundle/nsis/Dagpeek_${VERSION}_x64-setup.exe"
+          [ -f "$EXE" ] || { echo "no Windows installer for $VERSION at $EXE" >&2; exit 1; }
+          cp "$EXE" dist/Dagpeek-windows-setup.exe
+      - uses: actions/upload-artifact@v4
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        with:
+          name: dagpeek-windows
+          path: dist/Dagpeek-windows-setup.exe
+      - name: Create the release if absent
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            || gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+              --title "Dagpeek ${GITHUB_REF_NAME#v}" \
+              --notes "Download the app from https://dagpeek.com or install it with Homebrew."
+      - name: Upload the installer
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber \
+            dist/Dagpeek-windows-setup.exe

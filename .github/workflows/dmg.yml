@@ -1,0 +1,56 @@
+name: Disk image
+
+# The Mac download (Dagpeek-mac.dmg) is built here, after the cluster has signed, notarized and stapled the
+# app (infra's host/dagpeek-notarize), because a disk image cannot be made on the cluster's Linux host. The
+# cluster sends a repository_dispatch of type dagpeek-mac-signed with the tag once Dagpeek-mac.zip and
+# SHA256SUMS.txt are on the release. The app inside carries Apple's ticket, so the image itself needs no
+# signature of its own. Run it by hand with workflow_dispatch and a tag to rebuild the image.
+
+on:
+  repository_dispatch:
+    types: [dagpeek-mac-signed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag, e.g. v1.4.1
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  dmg:
+    runs-on: macos-14
+    steps:
+      - name: The tag
+        env:
+          TAG: ${{ github.event.client_payload.tag || inputs.tag }}
+        run: |
+          case "$TAG" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "'$TAG' is not a v<semver> tag" >&2; exit 1 ;;
+          esac
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+      - name: The notarized app
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p work/stage
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern Dagpeek-mac.zip --dir work
+          ditto -x -k work/Dagpeek-mac.zip work/stage
+          [ -d work/stage/Dagpeek.app ] || { echo "no Dagpeek.app in Dagpeek-mac.zip" >&2; exit 1; }
+          xcrun stapler validate work/stage/Dagpeek.app
+      - name: The image
+        run: |
+          ln -s /Applications work/stage/Applications
+          hdiutil create -volname Dagpeek -srcfolder work/stage -ov -format UDZO work/Dagpeek-mac.dmg
+      - name: Upload it and add it to SHA256SUMS.txt
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd work
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern SHA256SUMS.txt
+          grep -v ' Dagpeek-mac.dmg$' SHA256SUMS.txt > SHA256SUMS.new || true
+          shasum -a 256 Dagpeek-mac.dmg >> SHA256SUMS.new
+          mv SHA256SUMS.new SHA256SUMS.txt
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber Dagpeek-mac.dmg SHA256SUMS.txt
