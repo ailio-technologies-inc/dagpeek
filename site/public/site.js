@@ -1,10 +1,30 @@
 // Google Analytics for this website, by the visitor's consent (src/index.js holds the rules:
-// opt-out, except Quebec, which waits for Allow).
+// opt-out, except Quebec, which waits for Allow). Our own automated browsers never load it.
 (function () {
   'use strict';
 
   var ID = 'G-GQ102DTLE4';
+  var BOT_KEY = 'dagpeek:bot';
   var banner = document.getElementById('consent');
+
+  // An automated browser: it says so (navigator.webdriver), its user agent is headless Chrome or
+  // our end-to-end runner's (AilioE2E/1), or the page was opened with ?bot=1, which is remembered
+  // for later pages. abuzz.earth's detectAutomated (apps/thelull/src/app/perfBeacon.ts) is the same test.
+  function automated() {
+    try {
+      if (navigator.webdriver === true) return true;
+      if (/HeadlessChrome|AilioE2E\/1/.test(navigator.userAgent || '')) return true;
+      var store = null;
+      try { store = window.localStorage; } catch (e) { store = null; }
+      if (new URLSearchParams(location.search).get('bot') === '1') {
+        try { if (store) store.setItem(BOT_KEY, '1'); } catch (e) { /* the address says it for this page */ }
+        return true;
+      }
+      try { return !!store && store.getItem(BOT_KEY) === '1'; } catch (e) { return false; }
+    } catch (e) {
+      return false;
+    }
+  }
 
   function start() {
     window.dataLayer = window.dataLayer || [];
@@ -55,7 +75,7 @@
   fetch('/data/consent', { credentials: 'same-origin' })
     .then(function (response) { return response.json(); })
     .then(function (state) {
-      if (state.analytics) start();
+      if (state.analytics && !automated()) start();
       if (state.banner) banner.hidden = false;
     })
     .catch(function () {});

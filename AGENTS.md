@@ -5,9 +5,9 @@ A free tray app for Dagu, by Ailio. Tauri 2: `crates/core` (API client, progress
 - All Dagu calls are in Rust, never in the webview. Secrets go to the OS credential store only.
 - Actions on a Dagu server (stop, retry, dequeue) are on by default, can be turned off in Settings (checked again in Rust), and are always confirmed.
 - Unknown is not zero. Unreachable or refused never renders as "0 running". No ETA with fewer than 3 past successes.
-- The app's only telemetry is the daily count in crates/core/usage.rs: a random id, version and OS, never servers, DAGs or runs, and Settings turns it off. dagpeek.com loads Google Analytics only after consent.
+- The app's only telemetry is the daily count in crates/core/usage.rs: a random id, version and OS, never servers, DAGs or runs, and Settings turns it off. dagpeek.com loads Google Analytics only after consent, and never in our own automated browsers (`navigator.webdriver`, a `HeadlessChrome` or `AilioE2E/1` user agent, `?bot=1` remembered).
 - Release: push a `v*` tag. `.github/workflows/release.yml` builds the unsigned Mac app and Windows installer; the cluster (infra `docs/agents/dagpeek-release.md`) signs, notarizes and publishes them, then `dmg.yml` makes the disk image. `scripts/release.sh` is the local fallback.
-- Test: `cargo test --workspace`. Site deploys with `wrangler deploy` from `site/`.
+- Test: `cargo test --workspace`; the site's script: `pnpm test:site`. Site deploys with `wrangler deploy` from `site/`.
 
 ## Fixes are never one-offs
 
