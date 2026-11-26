@@ -1,4 +1,4 @@
-// The www redirect, the consent answer, the release line, and static assets.
+// The www redirect, the consent answer, the release line, the not-found status, and static assets.
 //
 // Consent is the same model as Ailio's other sites: analytics is opt-out, except that Quebec
 // (Law 25) waits for "Allow". The question shows only to a reader who has never answered.
@@ -97,6 +97,19 @@ async function homePage(request, env) {
   return out;
 }
 
+// The not-found page asked for by name. The assets binding serves public/404.html for /404 as an
+// ordinary page, with 200; it answers 404 like any unknown path. No conditional request, so never a 304.
+const NOT_FOUND_PATHS = new Set(['/404', '/404.html']);
+
+async function notFoundPage(request, env) {
+  const headers = new Headers(request.headers);
+  headers.delete('if-none-match');
+  headers.delete('if-modified-since');
+  const page = await env.ASSETS.fetch(new Request(request, { headers }));
+  if (page.status !== 200) return page;
+  return new Response(page.body, { status: 404, headers: page.headers });
+}
+
 export default {
   fetch(request, env) {
     const url = new URL(request.url);
@@ -106,6 +119,7 @@ export default {
     }
     if (url.pathname === '/data/consent') return consentRoute(request);
     if (url.pathname === '/' && (request.method === 'GET' || request.method === 'HEAD')) return homePage(request, env);
+    if (NOT_FOUND_PATHS.has(url.pathname)) return notFoundPage(request, env);
     return env.ASSETS.fetch(request);
   },
 };
